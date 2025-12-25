@@ -2,7 +2,7 @@
  * Darts - Vanilla JS Application
  */
 
-import { sectors, buildBoard, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow } from './game.js';
+import { settings, sectors, buildBoard, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, updateSettings } from './game.js';
 import './style.css';
 
 // Wait for DOM to be ready
@@ -19,9 +19,86 @@ function init() {
   const board = buildBoard(sectors);
   document.getElementById('board-container').appendChild(board);
   setupBoardEventListeners();
+  setupSettingsModal();
   
   // Start first game
   generateTarget();
+}
+
+/**
+ * Setup settings modal
+ */
+function setupSettingsModal() {
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsClose = document.getElementById('settings-close');
+  const settingsSave = document.getElementById('settings-save');
+  const settingsMin = document.getElementById('settings-min');
+  const settingsMax = document.getElementById('settings-max');
+  const settingsMentalMath = document.getElementById('settings-mental-math');
+  
+  // Initialize form with current settings
+  function loadFormValues() {
+    settingsMin.value = settings.min;
+    settingsMax.value = settings.max;
+    updateMentalMathToggle(settings.mentalMathMode);
+  }
+  
+  // Update toggle visual state
+  function updateMentalMathToggle(enabled) {
+    const toggle = settingsMentalMath;
+    const knob = toggle.querySelector('span');
+    if (enabled) {
+      toggle.classList.remove('bg-slate-600');
+      toggle.classList.add('bg-emerald-500');
+      knob.classList.add('translate-x-5');
+    } else {
+      toggle.classList.add('bg-slate-600');
+      toggle.classList.remove('bg-emerald-500');
+      knob.classList.remove('translate-x-5');
+    }
+    toggle.dataset.enabled = enabled;
+  }
+  
+  // Open modal
+  settingsBtn.addEventListener('click', () => {
+    loadFormValues();
+    settingsModal.classList.remove('hidden');
+    settingsModal.classList.add('flex');
+  });
+  
+  // Close modal
+  function closeModal() {
+    settingsModal.classList.add('hidden');
+    settingsModal.classList.remove('flex');
+  }
+  
+  settingsClose.addEventListener('click', closeModal);
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeModal();
+  });
+  
+  // Toggle mental math mode
+  settingsMentalMath.addEventListener('click', () => {
+    const currentState = settingsMentalMath.dataset.enabled === 'true';
+    updateMentalMathToggle(!currentState);
+  });
+  
+  // Save settings
+  settingsSave.addEventListener('click', () => {
+    const newMin = parseInt(settingsMin.value) || 2;
+    const newMax = parseInt(settingsMax.value) || 170;
+    const mentalMathEnabled = settingsMentalMath.dataset.enabled === 'true';
+    
+    updateSettings({
+      min: newMin,
+      max: newMax,
+      mentalMathMode: mentalMathEnabled
+    });
+    
+    closeModal();
+    generateTarget(); // Start new game with new settings
+  });
 }
 
 function setupBoardEventListeners() {

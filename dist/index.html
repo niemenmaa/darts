@@ -4,18 +4,67 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Darts</title>
-  <script type="module" crossorigin src="/darts/assets/index-DsIYTcHY.js"></script>
-  <link rel="stylesheet" crossorigin href="/darts/assets/index-DXBN3iYW.css">
+  <script type="module" crossorigin src="/darts/assets/index-DZe4UO85.js"></script>
+  <link rel="stylesheet" crossorigin href="/darts/assets/index-Dz4INgV6.css">
 </head>
 <body class="w-screen overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
   
   <div class="container mx-auto px-3 py-3 h-full flex flex-col">
-    <header class="text-center mb-2">
+    <header class="text-center mb-2 relative">
+      <button id="settings-btn" class="absolute right-0 top-0 p-2 text-xl text-slate-400 hover:text-white transition-colors">
+        ⚙️
+      </button>
       <h1 class="text-2xl font-bold bg-gradient-to-r from-primary-400 to-emerald-300 bg-clip-text text-transparent">
         Darts Endings
       </h1>
-      <p class="text-slate-500 text-xs">D = slide out, T = slide in</p>
+      <p class="text-slate-500 text-xs">Normal = tap/click , D = slide out, T = slide in</p>
     </header>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center">
+      <div class="bg-slate-800 rounded-2xl p-6 mx-4 w-full max-w-sm shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-white">Settings</h2>
+          <button id="settings-close" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        
+        <div class="space-y-5">
+          <!-- Min/Max Starting Value -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-3">Starting Score Range</label>
+            <div class="flex items-center gap-3">
+              <div class="flex-1">
+                <label class="text-xs text-slate-500 mb-1 block">Min</label>
+                <input type="number" id="settings-min" min="2" max="170" 
+                  class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-center focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <span class="text-slate-500 mt-5">–</span>
+              <div class="flex-1">
+                <label class="text-xs text-slate-500 mb-1 block">Max</label>
+                <input type="number" id="settings-max" min="2" max="170"
+                  class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-center focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Mental Math Mode -->
+          <div class="flex items-center justify-between py-3 border-t border-slate-700">
+            <div>
+              <label class="text-sm font-medium text-slate-300">Mental Math Mode</label>
+              <p class="text-xs text-slate-500 mt-1">Only shows total – you subtract in your head</p>
+            </div>
+            <button id="settings-mental-math" type="button" 
+              class="relative w-12 h-7 rounded-full bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform"></span>
+            </button>
+          </div>
+        </div>
+        
+        <button id="settings-save" class="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors">
+          Save & New Game
+        </button>
+      </div>
+    </div>
 
     <main id="app" class="max-w-2xl mx-auto flex-1 overflow-hidden">
       <div class="text-center mb-3">

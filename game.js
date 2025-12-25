@@ -3,7 +3,45 @@ let settings = {
     noOuts: [169,168,166,165,163,162,159],
     max: 170,
     min: 2,
+    mentalMathMode: false,
 }
+
+// Load settings from localStorage
+function loadSettings() {
+    const saved = localStorage.getItem('dartsSettings');
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        settings.min = parsed.min ?? 2;
+        settings.max = parsed.max ?? 170;
+        settings.mentalMathMode = parsed.mentalMathMode ?? false;
+    }
+}
+
+// Save settings to localStorage
+function saveSettings() {
+    localStorage.setItem('dartsSettings', JSON.stringify({
+        min: settings.min,
+        max: settings.max,
+        mentalMathMode: settings.mentalMathMode
+    }));
+}
+
+// Update settings from UI
+function updateSettings(newSettings) {
+    if (newSettings.min !== undefined) settings.min = Math.max(2, Math.min(170, newSettings.min));
+    if (newSettings.max !== undefined) settings.max = Math.max(2, Math.min(170, newSettings.max));
+    if (newSettings.mentalMathMode !== undefined) settings.mentalMathMode = newSettings.mentalMathMode;
+    
+    // Ensure min <= max
+    if (settings.min > settings.max) {
+        [settings.min, settings.max] = [settings.max, settings.min];
+    }
+    
+    saveSettings();
+}
+
+// Initialize settings on load
+loadSettings();
 
 let sectors = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
@@ -17,7 +55,7 @@ let gameStartTime = null;
 let throwsUsed = 0;
 let timerInterval = null;
 
-export { settings, sectors, buildBoard, clickSector, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, getGameState };
+export { settings, sectors, buildBoard, clickSector, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, getGameState, updateSettings };
 
 // Timer functions
 function startTimer() {
@@ -71,7 +109,12 @@ function updateUI() {
     const historyDisplay = document.getElementById('history-display');
     
     if (targetDisplay) {
-        targetDisplay.textContent = currentTarget;
+        // In mental math mode, only show the original target
+        if (settings.mentalMathMode) {
+            targetDisplay.textContent = originalTarget;
+        } else {
+            targetDisplay.textContent = currentTarget;
+        }
     }
     
     if (dartsDisplay) {

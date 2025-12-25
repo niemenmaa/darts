@@ -16,3 +16,8 @@ body {
   min-height: -webkit-fill-available;
 }
 
+/* Toggle switch animation */
+#settings-mental-math span {
+  transition: transform 0.2s ease-in-out;
+}
+
