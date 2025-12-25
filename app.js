@@ -36,12 +36,20 @@ function setupSettingsModal() {
   const settingsMin = document.getElementById('settings-min');
   const settingsMax = document.getElementById('settings-max');
   const settingsMentalMath = document.getElementById('settings-mental-math');
+  const settingsRingAccuracy = document.getElementById('settings-ring-accuracy');
+  const settingsSectorAccuracy = document.getElementById('settings-sector-accuracy');
+  const ringAccuracyValue = document.getElementById('ring-accuracy-value');
+  const sectorAccuracyValue = document.getElementById('sector-accuracy-value');
   
   // Initialize form with current settings
   function loadFormValues() {
     settingsMin.value = settings.min;
     settingsMax.value = settings.max;
     updateMentalMathToggle(settings.mentalMathMode);
+    settingsRingAccuracy.value = settings.ringAccuracy;
+    settingsSectorAccuracy.value = settings.sectorAccuracy;
+    ringAccuracyValue.textContent = `${settings.ringAccuracy}%`;
+    sectorAccuracyValue.textContent = `${settings.sectorAccuracy}%`;
   }
   
   // Update toggle visual state
@@ -59,6 +67,15 @@ function setupSettingsModal() {
     }
     toggle.dataset.enabled = enabled;
   }
+  
+  // Update accuracy value displays in real-time
+  settingsRingAccuracy.addEventListener('input', () => {
+    ringAccuracyValue.textContent = `${settingsRingAccuracy.value}%`;
+  });
+  
+  settingsSectorAccuracy.addEventListener('input', () => {
+    sectorAccuracyValue.textContent = `${settingsSectorAccuracy.value}%`;
+  });
   
   // Open modal
   settingsBtn.addEventListener('click', () => {
@@ -89,11 +106,15 @@ function setupSettingsModal() {
     const newMin = parseInt(settingsMin.value) || 2;
     const newMax = parseInt(settingsMax.value) || 170;
     const mentalMathEnabled = settingsMentalMath.dataset.enabled === 'true';
+    const ringAccuracy = parseInt(settingsRingAccuracy.value) || 100;
+    const sectorAccuracy = parseInt(settingsSectorAccuracy.value) || 100;
     
     updateSettings({
       min: newMin,
       max: newMax,
-      mentalMathMode: mentalMathEnabled
+      mentalMathMode: mentalMathEnabled,
+      ringAccuracy: ringAccuracy,
+      sectorAccuracy: sectorAccuracy
     });
     
     closeModal();

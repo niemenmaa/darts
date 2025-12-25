@@ -1,29 +1,36 @@
+import { getCookie, setCookie } from './cookie.js';
+
 let settings = {
     round: 0,
     noOuts: [169,168,166,165,163,162,159],
     max: 170,
     min: 2,
     mentalMathMode: false,
+    ringAccuracy: 100,    // % chance T/D hits the ring (miss = single)
+    sectorAccuracy: 100,  // % chance throw stays in sector (miss = neighbor)
 }
 
-// Load settings from localStorage
+// Load settings from cookie
 function loadSettings() {
-    const saved = localStorage.getItem('dartsSettings');
+    const saved = getCookie();
     if (saved) {
-        const parsed = JSON.parse(saved);
-        settings.min = parsed.min ?? 2;
-        settings.max = parsed.max ?? 170;
-        settings.mentalMathMode = parsed.mentalMathMode ?? false;
+        settings.min = saved.min ?? 2;
+        settings.max = saved.max ?? 170;
+        settings.mentalMathMode = saved.mentalMathMode ?? false;
+        settings.ringAccuracy = saved.ringAccuracy ?? 100;
+        settings.sectorAccuracy = saved.sectorAccuracy ?? 100;
     }
 }
 
-// Save settings to localStorage
+// Save settings to cookie
 function saveSettings() {
-    localStorage.setItem('dartsSettings', JSON.stringify({
+    setCookie({
         min: settings.min,
         max: settings.max,
-        mentalMathMode: settings.mentalMathMode
-    }));
+        mentalMathMode: settings.mentalMathMode,
+        ringAccuracy: settings.ringAccuracy,
+        sectorAccuracy: settings.sectorAccuracy
+    });
 }
 
 // Update settings from UI
@@ -31,6 +38,8 @@ function updateSettings(newSettings) {
     if (newSettings.min !== undefined) settings.min = Math.max(2, Math.min(170, newSettings.min));
     if (newSettings.max !== undefined) settings.max = Math.max(2, Math.min(170, newSettings.max));
     if (newSettings.mentalMathMode !== undefined) settings.mentalMathMode = newSettings.mentalMathMode;
+    if (newSettings.ringAccuracy !== undefined) settings.ringAccuracy = Math.max(0, Math.min(100, newSettings.ringAccuracy));
+    if (newSettings.sectorAccuracy !== undefined) settings.sectorAccuracy = Math.max(0, Math.min(100, newSettings.sectorAccuracy));
     
     // Ensure min <= max
     if (settings.min > settings.max) {
@@ -54,8 +63,155 @@ let gameHistory = []; // Array of { result, time, throws, target }
 let gameStartTime = null;
 let throwsUsed = 0;
 let timerInterval = null;
+let currentRoundThrows = []; // Array of throw results for current round
 
-export { settings, sectors, buildBoard, clickSector, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, getGameState, updateSettings };
+export { settings, sectors, buildBoard, clickSector, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, getGameState, updateSettings, applyMissChance, clearBoardMarkers };
+
+// Apply miss chance to a selection
+// Returns { original, actual, wasMiss, missType }
+function applyMissChance(selection) {
+    if (!selection) return null;
+    
+    const original = { ...selection };
+    let actual = { ...selection };
+    let wasMiss = false;
+    let missType = null;
+    
+    // Parse the throw type
+    const isTriple = selection.text.startsWith('T');
+    const isDouble = selection.text.startsWith('D') || selection.value === 50;
+    const isBull = selection.value === 25 || selection.value === 50;
+    
+    // Get the base number
+    let baseNumber;
+    if (isBull) {
+        baseNumber = selection.value; // 25 or 50
+    } else if (isTriple || isDouble) {
+        baseNumber = parseInt(selection.text.substring(1));
+    } else {
+        baseNumber = selection.value;
+    }
+    
+    // Step 1: Check sector accuracy (miss = go to neighbor)
+    // Bulls can't miss to neighbor sector
+    if (!isBull && settings.sectorAccuracy < 100) {
+        const roll = Math.random() * 100;
+        if (roll >= settings.sectorAccuracy) {
+            // Miss sector - go to random neighbor
+            const sectorIndex = sectors.indexOf(baseNumber);
+            const goLeft = Math.random() < 0.5;
+            const neighborIndex = goLeft 
+                ? (sectorIndex - 1 + sectors.length) % sectors.length
+                : (sectorIndex + 1) % sectors.length;
+            baseNumber = sectors[neighborIndex];
+            wasMiss = true;
+            missType = 'sector';
+        }
+    }
+    
+    // Step 2: Check ring accuracy for T/D throws (miss = becomes single)
+    if ((isTriple || (isDouble && !isBull)) && settings.ringAccuracy < 100) {
+        const roll = Math.random() * 100;
+        if (roll >= settings.ringAccuracy) {
+            // Miss ring - becomes single
+            actual.text = String(baseNumber);
+            actual.value = baseNumber;
+            wasMiss = true;
+            missType = missType ? 'both' : 'ring';
+        } else {
+            // Hit the ring with potentially new sector
+            if (isTriple) {
+                actual.text = `T${baseNumber}`;
+                actual.value = baseNumber * 3;
+            } else {
+                actual.text = `D${baseNumber}`;
+                actual.value = baseNumber * 2;
+            }
+        }
+    } else if (!isTriple && !isDouble) {
+        // Single throw - just update if sector changed
+        actual.text = String(baseNumber);
+        actual.value = baseNumber;
+    } else if (isBull) {
+        // Bull stays as is (no sector miss possible)
+        // But D50 could miss ring to become 25
+        if (selection.value === 50 && settings.ringAccuracy < 100) {
+            const roll = Math.random() * 100;
+            if (roll >= settings.ringAccuracy) {
+                actual.text = '25';
+                actual.value = 25;
+                wasMiss = true;
+                missType = 'ring';
+            }
+        }
+    } else {
+        // T/D with sector change but ring hit
+        if (isTriple) {
+            actual.text = `T${baseNumber}`;
+            actual.value = baseNumber * 3;
+        } else {
+            actual.text = `D${baseNumber}`;
+            actual.value = baseNumber * 2;
+        }
+    }
+    
+    return { original, actual, wasMiss, missType };
+}
+
+// Add a marker to the board showing where a dart landed
+function addBoardMarker(score, wasMiss) {
+    const board = document.getElementById('board');
+    if (!board) return;
+    
+    // Find the sector element
+    const sectorElements = board.querySelectorAll('[data-score]');
+    let targetSector = null;
+    
+    // Handle bullseye
+    if (score === 25 || score === 50) {
+        targetSector = board.querySelector('[data-score="50"]');
+    } else {
+        // Find sector by base number
+        const baseNum = parseInt(String(score).replace(/[TD]/g, ''));
+        for (const sector of sectorElements) {
+            if (parseInt(sector.dataset.score) === baseNum && sector.dataset.score !== '50') {
+                targetSector = sector;
+                break;
+            }
+        }
+    }
+    
+    if (!targetSector) return;
+    
+    // Create marker element
+    const marker = document.createElement('div');
+    marker.className = `dart-marker absolute w-3 h-3 rounded-full z-30 pointer-events-none ${wasMiss ? 'bg-yellow-400' : 'bg-white'} border-2 ${wasMiss ? 'border-yellow-600' : 'border-slate-600'}`;
+    
+    // Position marker
+    if (score === 25 || score === 50) {
+        // Bullseye - position near center
+        const offset = currentRoundThrows.length * 8 - 8;
+        marker.style.cssText = `top: 50%; left: 50%; transform: translate(calc(-50% + ${offset}px), -50%);`;
+    } else {
+        // Sector - position in the visible area (outer ring area)
+        const sectorIndex = sectors.indexOf(parseInt(targetSector.dataset.score));
+        const sectorAngle = 360 / sectors.length;
+        const angle = (sectorIndex * sectorAngle - 90) * Math.PI / 180; // -90 to start at top
+        const radius = 38 + (currentRoundThrows.length * 3); // Position in outer area
+        const x = 50 + radius * Math.cos(angle);
+        const y = 50 + radius * Math.sin(angle);
+        marker.style.cssText = `top: ${y}%; left: ${x}%; transform: translate(-50%, -50%);`;
+    }
+    
+    board.appendChild(marker);
+}
+
+// Clear all dart markers from board
+function clearBoardMarkers() {
+    const board = document.getElementById('board');
+    if (!board) return;
+    board.querySelectorAll('.dart-marker').forEach(m => m.remove());
+}
 
 // Timer functions
 function startTimer() {
@@ -92,6 +248,8 @@ function generateTarget() {
     remainingDarts = 3;
     gameStatus = null;
     throwsUsed = 0;
+    currentRoundThrows = [];
+    clearBoardMarkers();
     startTimer();
     updateUI();
     return target;
@@ -107,6 +265,7 @@ function updateUI() {
     const dartsDisplay = document.getElementById('darts-display');
     const statusDisplay = document.getElementById('game-status');
     const historyDisplay = document.getElementById('history-display');
+    const throwsDisplay = document.getElementById('throws-display');
     
     if (targetDisplay) {
         // In mental math mode, only show the original target
@@ -118,7 +277,19 @@ function updateUI() {
     }
     
     if (dartsDisplay) {
-        dartsDisplay.textContent = '🎯'.repeat(remainingDarts);
+        // Show darts with used ones dimmed
+        const usedDarts = 3 - remainingDarts;
+        let dartsHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const opacity = i < usedDarts ? 'opacity-30' : '';
+            dartsHTML += `<span class="${opacity}">🎯</span>`;
+        }
+        dartsDisplay.innerHTML = dartsHTML;
+    }
+    
+    if (throwsDisplay) {
+        // Show throw results
+        throwsDisplay.textContent = currentRoundThrows.map(t => t.text).join(' | ');
     }
     
     if (statusDisplay) {
@@ -146,12 +317,42 @@ function updateUI() {
     }
 }
 
+// Show miss notification
+function showMissNotification(original, actual) {
+    const notification = document.getElementById('miss-notification');
+    if (!notification) return;
+    
+    notification.textContent = `Missed! ${original.text} → ${actual.text}`;
+    notification.style.opacity = '1';
+    
+    // Fade out after 2 seconds
+    setTimeout(() => {
+        notification.style.opacity = '0';
+    }, 2000);
+}
+
 // Handle a throw - returns { text, value, isDouble }
 function handleThrow(selection) {
     if (!selection) return;
     
-    const { text, value } = selection;
+    // Apply miss chance
+    const missResult = applyMissChance(selection);
+    if (!missResult) return;
+    
+    const { original, actual, wasMiss } = missResult;
+    const { text, value } = actual;
     const isDouble = text.startsWith('D') || value === 50; // D prefix or bull (50 counts as double)
+    
+    // Show miss notification if missed
+    if (wasMiss) {
+        showMissNotification(original, actual);
+    }
+    
+    // Track throw for display
+    currentRoundThrows.push(actual);
+    
+    // Add marker to board
+    addBoardMarker(actual.text, wasMiss);
     
     // Clear win/lose message on first throw of new round
     if (gameStatus !== null) {
