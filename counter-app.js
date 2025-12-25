@@ -30,6 +30,10 @@ import {
     buildBoard,
     getDistanceFromCenter,
     INTERACTIVE_ZONE_MIN,
+    getActiveSelection,
+    slideOutSector,
+    slideInSector,
+    resetActiveSector,
     hasSavedGame,
     clearSavedGame
 } from './counter-game.js';
@@ -44,7 +48,6 @@ let gamePlayScreen;
 let currentScreen = 'player-setup';
 
 // Board interaction state
-let activeSector = null;
 let isDragging = false;
 let lastDistance = null;
 let lockedDirection = null;
@@ -430,6 +433,8 @@ function setupBoardEventListeners(board) {
         return Math.sqrt(dx * dx + dy * dy);
     }
     
+    let startedOnBull = false;
+    
     function handleDragStart(clientX, clientY, event) {
         isDragging = true;
         hasDragged = false;
@@ -438,6 +443,7 @@ function setupBoardEventListeners(board) {
         
         const sector = event.target.closest('[data-score]');
         const isBullseye = sector && sector.dataset.score === '50';
+        startedOnBull = isBullseye;
         const distancePercent = getDistanceFromCenter(event, board);
         inInteractiveZone = isBullseye || distancePercent >= INTERACTIVE_ZONE_MIN;
     }
@@ -453,40 +459,30 @@ function setupBoardEventListeners(board) {
             hasDragged = true;
         }
         
-        if (lockedDirection) {
-            const sector = event.target.closest('[data-score]');
-            if (sector && sector.dataset.score !== '50') {
-                highlightSector(sector, lockedDirection);
-            }
+        // Use shared slide functions for highlighting
+        if (lockedDirection === 'out') {
+            slideOutSector(event);
+        } else if (lockedDirection === 'in') {
+            slideInSector(event);
         }
     }
     
     function handleDragEnd(event) {
-        if (lockedDirection && activeSector) {
-            const score = parseInt(activeSector.dataset.score);
-            const isDouble = lockedDirection === 'out';
-            const isTriple = lockedDirection === 'in';
-            
-            let text, value;
-            if (isDouble) {
-                text = `D${score}`;
-                value = score * 2;
-            } else if (isTriple) {
-                text = `T${score}`;
-                value = score * 3;
-            } else {
-                text = String(score);
-                value = score;
+        // Handle throw if we had a locked direction
+        if (lockedDirection) {
+            const selection = getActiveSelection();
+            if (selection) {
+                const isDouble = selection.text.startsWith('D') || selection.value === 50;
+                handleThrowInput({ text: selection.text, value: selection.value, isDouble });
             }
-            
-            handleThrowInput({ text, value, isDouble });
         }
         
-        resetSectorHighlight();
+        resetActiveSector();
         isDragging = false;
         lastDistance = null;
         lockedDirection = null;
         inInteractiveZone = false;
+        startedOnBull = false;
     }
     
     function handleClick(event) {
@@ -530,69 +526,6 @@ function setupBoardEventListeners(board) {
     
     board.addEventListener('touchend', (e) => handleDragEnd(e));
     board.addEventListener('touchcancel', (e) => handleDragEnd(e));
-    
-    // 25 (outer bull) - add click handler for the green ring around bull
-    const bullseye = board.querySelector('[data-score="50"]');
-    if (bullseye) {
-        // Create outer bull ring
-        const outerBull = document.createElement('div');
-        outerBull.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-green-700 z-10 cursor-pointer hover:brightness-125 transition-all';
-        outerBull.dataset.score = '25';
-        board.insertBefore(outerBull, bullseye);
-        
-        outerBull.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleThrowInput({ text: '25', value: 25, isDouble: false });
-        });
-    }
-}
-
-function highlightSector(sector, direction) {
-    resetSectorHighlight();
-    
-    activeSector = sector;
-    const score = sector.dataset.score;
-    const index = sectors.indexOf(parseInt(score));
-    const isEven = index % 2 === 0;
-    
-    sector.style.background = isEven ? '#dc2626' : '#16a34a';
-    
-    const label = sector.querySelector('span');
-    if (label) {
-        label.textContent = direction === 'out' ? `D${score}` : `T${score}`;
-        label.style.color = '#ffffff';
-    }
-}
-
-function resetSectorHighlight() {
-    if (activeSector) {
-        const score = activeSector.dataset.score;
-        const index = sectors.indexOf(parseInt(score));
-        const isEven = index % 2 === 0;
-        
-        const baseColor = isEven ? '#1a1a1a' : '#f5f5dc';
-        const ringColor = isEven ? '#dc2626' : '#16a34a';
-        
-        const gradient = `radial-gradient(circle closest-side at 50% 50%, 
-            ${baseColor} 0%, 
-            ${baseColor} 53%, 
-            ${ringColor} 53%, 
-            ${ringColor} 55%, 
-            ${baseColor} 55%, 
-            ${baseColor} 98%, 
-            ${ringColor} 98%, 
-            ${ringColor} 100%)`;
-        
-        activeSector.style.background = gradient;
-        
-        const label = activeSector.querySelector('span');
-        if (label) {
-            label.textContent = score;
-            label.style.color = isEven ? '#f5f5dc' : '#1a1a1a';
-        }
-        
-        activeSector = null;
-    }
 }
 
 function handleThrowInput(throwData) {

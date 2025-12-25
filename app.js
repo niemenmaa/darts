@@ -2,7 +2,7 @@
  * Darts - Vanilla JS Application
  */
 
-import { settings, sectors, buildBoard, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, updateSettings } from './game.js';
+import { settings, buildBoard, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, updateSettings } from './game.js';
 import './style.css';
 
 // Wait for DOM to be ready
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize the application
  */
 function init() {
-  const board = buildBoard(sectors);
+  const board = buildBoard();
   document.getElementById('board-container').appendChild(board);
   setupBoardEventListeners();
   setupMenu();

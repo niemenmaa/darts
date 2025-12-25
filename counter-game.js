@@ -4,9 +4,28 @@
  */
 
 import { getCookie, setCookie } from './cookie.js';
+import { 
+    sectors, 
+    buildBoard, 
+    getDistanceFromCenter, 
+    INTERACTIVE_ZONE_MIN,
+    getActiveSelection,
+    slideOutSector,
+    slideInSector,
+    resetActiveSector
+} from './board.js';
 
-// Dartboard sectors in clockwise order (for board rendering)
-export const sectors = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+// Re-export board utilities for counter-app.js
+export { 
+    sectors, 
+    buildBoard, 
+    getDistanceFromCenter, 
+    INTERACTIVE_ZONE_MIN,
+    getActiveSelection,
+    slideOutSector,
+    slideInSector,
+    resetActiveSector
+};
 
 const COUNTER_COOKIE_NAME = 'dartsCounterGame';
 
@@ -381,88 +400,3 @@ export function getCurrentThrowCount() {
 export function getCurrentThrows() {
     return [...gameState.currentTurn.throws];
 }
-
-// Build dartboard (reused from game.js with modifications)
-export function buildBoard() {
-    const totalSectors = sectors.length;
-    const sectorAngle = 360 / totalSectors;
-
-    let board = document.createElement('div');
-    board.id = 'board';
-    board.className = 'relative w-full aspect-square rounded-full mx-auto overflow-hidden';
-
-    sectors.forEach((score, index) => {
-        const sectorElement = document.createElement('div');
-        sectorElement.dataset.score = score;
-        const rotation = index * sectorAngle;
-        const isEven = index % 2 === 0;
-
-        const halfAngle = sectorAngle / 2;
-        const rad = (halfAngle * Math.PI) / 180;
-        const xOffset = 50 * Math.tan(rad);
-        const leftX = 50 - xOffset;
-        const rightX = 50 + xOffset;
-
-        const baseColor = isEven ? '#1a1a1a' : '#f5f5dc';
-        const ringColor = isEven ? '#dc2626' : '#16a34a';
-        
-        const gradient = `radial-gradient(circle closest-side at 50% 50%, 
-            ${baseColor} 0%, 
-            ${baseColor} 53%, 
-            ${ringColor} 53%, 
-            ${ringColor} 55%, 
-            ${baseColor} 55%, 
-            ${baseColor} 98%, 
-            ${ringColor} 98%, 
-            ${ringColor} 100%)`;
-
-        sectorElement.className = 'absolute inset-0 flex items-start justify-center cursor-pointer transition-all hover:brightness-125 hover:z-10';
-        sectorElement.style.cssText = `
-            clip-path: polygon(50% 50%, ${leftX}% 0%, ${rightX}% 0%);
-            transform: rotate(${rotation}deg);
-            background: ${gradient};
-        `;
-
-        const label = document.createElement('span');
-        label.className = 'mt-4 text-xs font-bold select-none';
-        label.style.cssText = `
-            transform: rotate(${-rotation}deg);
-            color: ${isEven ? '#f5f5dc' : '#1a1a1a'};
-        `;
-        label.textContent = score;
-
-        sectorElement.appendChild(label);
-        board.appendChild(sectorElement);
-    });
-
-    // Center bullseye
-    const bullseye = document.createElement('div');
-    bullseye.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-red-600 border-4 border-green-700 z-20 cursor-pointer hover:scale-110 transition-transform';
-    bullseye.dataset.score = 50;
-    board.appendChild(bullseye);
-
-    return board;
-}
-
-// Get distance from board center as percentage
-export function getDistanceFromCenter(event, board) {
-    if (!board) return 0;
-    
-    const rect = board.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const radius = rect.width / 2;
-    
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    
-    const dx = clientX - centerX;
-    const dy = clientY - centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    return (distance / radius) * 100;
-}
-
-// Interactive zone minimum (where triple ring starts)
-export const INTERACTIVE_ZONE_MIN = 53;
-
