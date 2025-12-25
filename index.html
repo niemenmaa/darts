@@ -2,34 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Darts</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+<body class="w-screen overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
   
-  <div class="container mx-auto px-3 py-3">
+  <div class="container mx-auto px-3 py-3 h-full flex flex-col">
     <header class="text-center mb-2">
       <h1 class="text-2xl font-bold bg-gradient-to-r from-primary-400 to-emerald-300 bg-clip-text text-transparent">
-        Darts
+        Darts Endings
       </h1>
       <p class="text-slate-500 text-xs">D = slide out, T = slide in</p>
     </header>
 
-    <main id="app" class="max-w-2xl mx-auto">
-      <div id="score-display" class="text-center text-4xl font-bold mb-3 h-10 flex items-center justify-center transition-transform duration-150">
-        -
+    <main id="app" class="max-w-2xl mx-auto flex-1 overflow-hidden">
+      <div class="text-center mb-3">
+        <div id="target-display" class="text-5xl font-bold text-emerald-400">-</div>
+        <div class="flex items-center justify-center gap-4 mt-1">
+          <div id="darts-display" class="text-2xl">🎯🎯🎯</div>
+          <div id="timer-display" class="text-xl text-slate-400 font-mono">0s</div>
+        </div>
+        <div id="game-status" class="text-3xl font-bold mt-2 h-10"></div>
       </div>
       
-      <div id="board-container"></div>
-      <div id="grid-container" class="hidden"></div>
-      
-      <div id="mode-selector" class="flex justify-center mt-4">
-        <select id="mode-select" class="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-          <option value="board">Board</option>
-          <option value="grid">Grid</option>
-        </select>
-      </div>
+      <div id="board-container" class="w-full min-w-[95vw] sm:max-w-sm mx-auto"></div>
+      <div id="history-display" class="max-w-xs mx-auto mt-2 text-sm overflow-y-auto max-h-24 bg-slate-800/50 rounded-lg"></div>
     </main>
 
     <footer class="text-center mt-4 text-slate-600 text-xs">

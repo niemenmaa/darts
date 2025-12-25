@@ -2,10 +2,8 @@
  * Darts - Vanilla JS Application
  */
 
-import { settings, sectors, buildBoard, buildGrid, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, handleModifierClick, handleGridNumberClick, resetModifier } from './game.js';
+import { sectors, buildBoard, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow } from './game.js';
 import './style.css';
-
-let currentMode = 'board';
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,77 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize the application
  */
 function init() {
-  // Build both views
   const board = buildBoard(sectors);
-  const grid = buildGrid();
-  
   document.getElementById('board-container').appendChild(board);
-  document.getElementById('grid-container').appendChild(grid);
-  
-  // Set up event listeners
   setupBoardEventListeners();
-  setupGridEventListeners();
-  setupModeSelector();
-}
-
-function setupModeSelector() {
-  const modeSelect = document.getElementById('mode-select');
-  const boardContainer = document.getElementById('board-container');
-  const gridContainer = document.getElementById('grid-container');
   
-  function setMode(mode, updateHash = true) {
-    currentMode = mode;
-    modeSelect.value = mode;
-    
-    if (mode === 'board') {
-      boardContainer.classList.remove('hidden');
-      gridContainer.classList.add('hidden');
-    } else {
-      boardContainer.classList.add('hidden');
-      gridContainer.classList.remove('hidden');
-      resetModifier();
-    }
-    
-    // Update URL hash
-    if (updateHash) {
-      window.location.hash = mode;
-    }
-  }
-  
-  // Check URL hash on load
-  const hash = window.location.hash.slice(1); // Remove #
-  if (hash === 'board' || hash === 'grid') {
-    setMode(hash, false);
-  }
-  
-  // Listen for dropdown changes
-  modeSelect.addEventListener('change', (e) => setMode(e.target.value));
-  
-  // Listen for hash changes (back/forward browser navigation)
-  window.addEventListener('hashchange', () => {
-    const newHash = window.location.hash.slice(1);
-    if (newHash === 'board' || newHash === 'grid') {
-      setMode(newHash, false);
-    }
-  });
-}
-
-function setupGridEventListeners() {
-  const grid = document.getElementById('grid');
-  
-  // Modifier buttons
-  grid.addEventListener('click', (e) => {
-    const modifier = e.target.dataset.modifier;
-    if (modifier) {
-      handleModifierClick(modifier);
-      return;
-    }
-    
-    const number = e.target.dataset.number;
-    if (number) {
-      handleGridNumberClick(number);
-    }
-  });
+  // Start first game
+  generateTarget();
 }
 
 function setupBoardEventListeners() {
@@ -99,6 +32,7 @@ function setupBoardEventListeners() {
   let lastDistance = null;
   let lockedDirection = null; // 'out' for double, 'in' for triple
   let hasDragged = false; // Track if actual dragging occurred
+  let inInteractiveZone = false; // Track if drag started in interactive zone
   
   function getCenter() {
     const rect = board.getBoundingClientRect();
@@ -108,24 +42,30 @@ function setupBoardEventListeners() {
     };
   }
   
-  function getDistanceFromCenter(clientX, clientY) {
+  function getLocalDistanceFromCenter(clientX, clientY) {
     const center = getCenter();
     const dx = clientX - center.x;
     const dy = clientY - center.y;
     return Math.sqrt(dx * dx + dy * dy);
   }
   
-  function handleDragStart(clientX, clientY) {
+  function handleDragStart(clientX, clientY, event) {
     isDragging = true;
     hasDragged = false;
-    lastDistance = getDistanceFromCenter(clientX, clientY);
+    lastDistance = getLocalDistanceFromCenter(clientX, clientY);
     lockedDirection = null;
+    
+    // Check if starting in interactive zone or on bullseye
+    const sector = event.target.closest('[data-score]');
+    const isBullseye = sector && sector.dataset.score === '50';
+    const distancePercent = getDistanceFromCenter(event);
+    inInteractiveZone = isBullseye || distancePercent >= INTERACTIVE_ZONE_MIN;
   }
   
   function handleDragMove(clientX, clientY, event) {
-    if (!isDragging) return;
+    if (!isDragging || !inInteractiveZone) return;
     
-    const currentDistance = getDistanceFromCenter(clientX, clientY);
+    const currentDistance = getLocalDistanceFromCenter(clientX, clientY);
     const threshold = 5; // minimum movement to trigger
     
     // Lock direction on first significant movement
@@ -143,17 +83,18 @@ function setupBoardEventListeners() {
   }
   
   function handleDragEnd(event) {
-    // Show score if we had a locked direction
+    // Handle throw if we had a locked direction
     if (lockedDirection) {
       const selection = getActiveSelection();
       if (selection) {
-        showScore(selection.text);
+        handleThrow(selection);
       }
     }
     
     isDragging = false;
     lastDistance = null;
     lockedDirection = null;
+    inInteractiveZone = false;
     resetActiveSector();
   }
   
@@ -166,12 +107,22 @@ function setupBoardEventListeners() {
     
     const sector = event.target.closest('[data-score]');
     if (sector) {
-      showScore(sector.dataset.score);
+      // Allow bullseye clicks always, check zone for sectors
+      if (sector.dataset.score === '50') {
+        handleThrow({ text: '50', value: 50 });
+      } else {
+        // Check if click is in interactive zone (53-100%)
+        const distance = getDistanceFromCenter(event);
+        if (distance >= INTERACTIVE_ZONE_MIN) {
+          const score = parseInt(sector.dataset.score);
+          handleThrow({ text: String(score), value: score });
+        }
+      }
     }
   }
   
   // Mouse events
-  board.addEventListener('mousedown', (e) => handleDragStart(e.clientX, e.clientY));
+  board.addEventListener('mousedown', (e) => handleDragStart(e.clientX, e.clientY, e));
   board.addEventListener('mousemove', (e) => handleDragMove(e.clientX, e.clientY, e));
   board.addEventListener('mouseup', (e) => handleDragEnd(e));
   board.addEventListener('mouseleave', (e) => handleDragEnd(e));
@@ -180,7 +131,7 @@ function setupBoardEventListeners() {
   // Touch events
   board.addEventListener('touchstart', (e) => {
     const touch = e.touches[0];
-    handleDragStart(touch.clientX, touch.clientY);
+    handleDragStart(touch.clientX, touch.clientY, e);
   }, { passive: true });
   
   board.addEventListener('touchmove', (e) => {

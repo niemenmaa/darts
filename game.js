@@ -7,7 +7,167 @@ let settings = {
 
 let sectors = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
-export { settings, sectors, buildBoard, buildGrid, clickSector, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, handleModifierClick, handleGridNumberClick, resetModifier };
+// Game state
+let currentTarget = 0;
+let originalTarget = 0;
+let remainingDarts = 3;
+let gameStatus = null; // null, 'win', or 'lose'
+let gameHistory = []; // Array of { result, time, throws, target }
+let gameStartTime = null;
+let throwsUsed = 0;
+let timerInterval = null;
+
+export { settings, sectors, buildBoard, clickSector, slideOutSector, slideInSector, resetActiveSector, getActiveSelection, showScore, getDistanceFromCenter, INTERACTIVE_ZONE_MIN, generateTarget, handleThrow, getGameState };
+
+// Timer functions
+function startTimer() {
+    stopTimer();
+    gameStartTime = Date.now();
+    updateTimerDisplay();
+    timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function updateTimerDisplay() {
+    const timerDisplay = document.getElementById('timer-display');
+    if (timerDisplay && gameStartTime) {
+        const seconds = Math.floor((Date.now() - gameStartTime) / 1000);
+        timerDisplay.textContent = `${seconds}s`;
+    }
+}
+
+// Generate random target between min and max, excluding noOuts
+function generateTarget() {
+    let target;
+    do {
+        target = Math.floor(Math.random() * (settings.max - settings.min + 1)) + settings.min;
+    } while (settings.noOuts.includes(target));
+    
+    currentTarget = target;
+    originalTarget = target;
+    remainingDarts = 3;
+    gameStatus = null;
+    throwsUsed = 0;
+    startTimer();
+    updateUI();
+    return target;
+}
+
+function getGameState() {
+    return { currentTarget, remainingDarts, gameStatus };
+}
+
+// Update UI elements
+function updateUI() {
+    const targetDisplay = document.getElementById('target-display');
+    const dartsDisplay = document.getElementById('darts-display');
+    const statusDisplay = document.getElementById('game-status');
+    const historyDisplay = document.getElementById('history-display');
+    
+    if (targetDisplay) {
+        targetDisplay.textContent = currentTarget;
+    }
+    
+    if (dartsDisplay) {
+        dartsDisplay.textContent = '🎯'.repeat(remainingDarts);
+    }
+    
+    if (statusDisplay) {
+        if (gameStatus === 'win') {
+            statusDisplay.textContent = 'WIN!';
+            statusDisplay.className = 'text-3xl font-bold mt-2 h-10 text-green-400';
+        } else if (gameStatus === 'lose') {
+            statusDisplay.textContent = 'LOSE';
+            statusDisplay.className = 'text-3xl font-bold mt-2 h-10 text-red-400';
+        } else {
+            statusDisplay.textContent = '';
+            statusDisplay.className = 'text-3xl font-bold mt-2 h-10';
+        }
+    }
+    
+    if (historyDisplay) {
+        historyDisplay.innerHTML = gameHistory.map(game => 
+            `<div class="flex justify-between items-center px-2 py-1 ${game.result === 'W' ? 'text-green-400' : 'text-red-400'}">
+                <span class="font-bold">${game.result === 'W' ? '✓' : '✗'}</span>
+                <span>${game.target}</span>
+                <span>${game.throws}🎯</span>
+                <span>${game.time}s</span>
+            </div>`
+        ).join('');
+    }
+}
+
+// Handle a throw - returns { text, value, isDouble }
+function handleThrow(selection) {
+    if (!selection) return;
+    
+    const { text, value } = selection;
+    const isDouble = text.startsWith('D') || value === 50; // D prefix or bull (50 counts as double)
+    
+    // Clear win/lose message on first throw of new round
+    if (gameStatus !== null) {
+        gameStatus = null;
+    }
+    
+    // Track throws
+    throwsUsed++;
+    
+    // Subtract from target
+    currentTarget -= value;
+    remainingDarts--;
+    
+    // Helper to record game result
+    const recordGame = (result) => {
+        stopTimer();
+        const timeSeconds = Math.round((Date.now() - gameStartTime) / 1000);
+        gameHistory.unshift({ 
+            result, 
+            time: timeSeconds, 
+            throws: throwsUsed,
+            target: originalTarget
+        });
+        // Keep only last 10 games
+        if (gameHistory.length > 10) gameHistory.pop();
+    };
+    
+    // Check win/lose conditions
+    if (currentTarget === 0) {
+        if (isDouble) {
+            gameStatus = 'win';
+            recordGame('W');
+        } else {
+            gameStatus = 'lose';
+            recordGame('L');
+        }
+        // Prepare next round
+        setTimeout(() => {
+            generateTarget();
+        }, 1500);
+    } else if (currentTarget < 0) {
+        gameStatus = 'lose';
+        recordGame('L');
+        // Prepare next round
+        setTimeout(() => {
+            generateTarget();
+        }, 1500);
+    } else if (remainingDarts === 0) {
+        gameStatus = 'lose';
+        recordGame('L');
+        // Prepare next round
+        setTimeout(() => {
+            generateTarget();
+        }, 1500);
+    }
+    
+    updateUI();
+    return { text, value, isDouble };
+}
 
 function buildBoard(sectors) {
     const totalSectors = sectors.length;
@@ -30,11 +190,29 @@ function buildBoard(sectors) {
         const leftX = 50 - xOffset;
         const rightX = 50 + xOffset;
 
+        // Traditional dartboard colors: black sectors get red rings, white sectors get green rings
+        const baseColor = isEven ? '#1a1a1a' : '#f5f5dc';
+        const ringColor = isEven ? '#dc2626' : '#16a34a'; // red-600 / green-600
+        
+        // Radial gradient for double (outer) and triple (inner) rings
+        // Using closest-side so 100% = edge of visible wedge
+        // Inner area (0-53%) is heavily dimmed to indicate it's disabled
+        const veryDimmed = isEven ? 'rgba(10,10,10,0.7)' : 'rgba(100,100,80,0.7)';
+        const gradient = `radial-gradient(circle closest-side at 50% 50%, 
+            ${veryDimmed} 0%, 
+            ${veryDimmed} 53%, 
+            ${ringColor} 53%, 
+            ${ringColor} 55%, 
+            ${baseColor} 55%, 
+            ${baseColor} 98%, 
+            ${ringColor} 98%, 
+            ${ringColor} 100%)`;
+
         sectorElement.className = 'absolute inset-0 flex items-start justify-center cursor-pointer transition-all hover:brightness-125 hover:z-10';
         sectorElement.style.cssText = `
             clip-path: polygon(50% 50%, ${leftX}% 0%, ${rightX}% 0%);
             transform: rotate(${rotation}deg);
-            background: ${isEven ? '#1a1a1a' : '#f5f5dc'};
+            background: ${gradient};
         `;
 
         // Label with counter-rotation to keep text readable
@@ -48,14 +226,14 @@ function buildBoard(sectors) {
 
         sectorElement.appendChild(label);
         sectorElement.dataset.score = score;
-        sectorElement.dataset.originalBg = isEven ? '#1a1a1a' : '#f5f5dc';
+        sectorElement.dataset.originalBg = gradient;
         sectorElement.dataset.originalColor = isEven ? '#f5f5dc' : '#1a1a1a';
         board.appendChild(sectorElement);
     });
 
     // Center bullseye
     const bullseye = document.createElement('div');
-    bullseye.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-red-600 border-8 border-green-700 z-20 cursor-pointer hover:scale-110 transition-transform';
+    bullseye.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-red-600 border-4 border-green-700 z-20 cursor-pointer hover:scale-110 transition-transform';
     bullseye.dataset.score = 50;
     board.appendChild(bullseye);
 
@@ -208,6 +386,30 @@ function clickSector(event) {
     console.log(score);
 }
 
+// Calculate distance from board center as percentage (0 = center, 100 = edge)
+function getDistanceFromCenter(event) {
+    const board = document.getElementById('board');
+    if (!board) return 0;
+    
+    const rect = board.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const radius = rect.width / 2;
+    
+    // Get touch or mouse coordinates
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+    
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    return (distance / radius) * 100;
+}
+
+// Interactive zone: 53% (triple ring start) to 100% (edge)
+const INTERACTIVE_ZONE_MIN = 53;
+
 let activeSector = null;
 
 function getActiveSelection() {
@@ -251,17 +453,28 @@ function slideOutSector(event) {
     const sector = event.target.closest('[data-score]');
     if (!sector) return;
     
-    // Reset previous sector if different
-    if (activeSector && activeSector !== sector) {
-        resetSector(activeSector);
-    }
-    
-    // Handle bullseye - sliding out gives 25 (outer bull)
+    // Handle bullseye first - always allowed
     if (sector.dataset.score === '50') {
+        // Reset previous sector if different
+        if (activeSector && activeSector !== sector) {
+            resetSector(activeSector);
+        }
         sector.dataset.mode = 'outerBull';
         activeSector = sector;
         console.log('25');
         return;
+    }
+    
+    // Check if touch is in interactive zone (triple ring to edge)
+    const distance = getDistanceFromCenter(event);
+    if (distance < INTERACTIVE_ZONE_MIN) {
+        // Touch is in dead zone (between bull and triple ring)
+        return;
+    }
+    
+    // Reset previous sector if different
+    if (activeSector && activeSector !== sector) {
+        resetSector(activeSector);
     }
     
     if (!sector.dataset.originalBg) return;
@@ -286,6 +499,13 @@ function slideOutSector(event) {
 function slideInSector(event) {
     const sector = event.target.closest('[data-score]');
     if (!sector || !sector.dataset.originalBg) return; // Skip bullseye
+    
+    // Check if touch is in interactive zone (triple ring to edge)
+    const distance = getDistanceFromCenter(event);
+    if (distance < INTERACTIVE_ZONE_MIN) {
+        // Touch is in dead zone (between bull and triple ring)
+        return;
+    }
     
     const score = sector.dataset.score;
     const label = sector.querySelector('span');

@@ -2,7 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body {
   font-family: 'DM Sans', system-ui, sans-serif;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  position: fixed;
+  touch-action: manipulation;
+}
+
+body {
+  min-height: -webkit-fill-available;
 }
 
