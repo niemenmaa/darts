@@ -24,6 +24,17 @@
         <span class="text-lg">🎯</span>
         <span>Endings Practice</span>
       </a>
+      <div id="menu-game-options" class="hidden">
+        <div class="border-t border-slate-700"></div>
+        <button id="menu-settings-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+          <span class="text-lg">⚙️</span>
+          <span>Settings</span>
+        </button>
+        <button id="menu-new-game-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+          <span class="text-lg">🔄</span>
+          <span>New Game</span>
+        </button>
+      </div>
     </div>
 
     <main id="app" class="flex-1 overflow-hidden flex flex-col">
@@ -77,15 +88,26 @@
         </div>
         
         <!-- Double Out Toggle -->
-        <div class="flex items-center justify-between py-4 px-5 bg-slate-800/80 rounded-xl mb-6 border border-slate-700/50">
+        <div class="flex items-center justify-between py-3 px-4 bg-slate-800/80 rounded-xl mb-3 border border-slate-700/50">
           <div>
             <label class="text-sm font-medium text-white">Double Out</label>
             <p class="text-xs text-slate-500 mt-0.5">Must finish on a double</p>
           </div>
           <button id="double-out-toggle" type="button" data-enabled="true"
-            class="relative flex-shrink-0 rounded-full bg-emerald-500 transition-all focus:outline-none border-2 border-emerald-400"
-            style="width: 56px; height: 32px; min-width: 56px;">
-            <span class="absolute left-0.5 top-0.5 w-6 h-6 bg-white rounded-full transition-transform translate-x-6 shadow-lg"></span>
+            class="relative w-12 h-7 rounded-full bg-emerald-500 transition-colors focus:outline-none flex-shrink-0">
+            <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform translate-x-5 shadow-lg"></span>
+          </button>
+        </div>
+        
+        <!-- Mental Math Mode Toggle -->
+        <div class="flex items-center justify-between py-3 px-4 bg-slate-800/80 rounded-xl mb-6 border border-slate-700/50">
+          <div>
+            <label class="text-sm font-medium text-white">Mental Math</label>
+            <p class="text-xs text-slate-500 mt-0.5">Only shows total – you subtract</p>
+          </div>
+          <button id="mental-math-toggle" type="button" data-enabled="false"
+            class="relative w-12 h-7 rounded-full bg-slate-600 transition-colors focus:outline-none flex-shrink-0">
+            <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform shadow-lg"></span>
           </button>
         </div>
         
@@ -113,53 +135,75 @@
       <!-- Screen 3: Game Play -->
       <div id="game-play-screen" class="hidden flex flex-col h-full">
         <!-- Score Display -->
-        <div class="text-center mb-3">
-          <div id="remaining-score" class="text-7xl font-black text-amber-400 tabular-nums tracking-tight">301</div>
-          <div id="current-player-name" class="text-xl font-medium text-white mt-1">Player 1</div>
-          <div id="turn-throws" class="text-base text-slate-400 h-7 mt-2 font-mono"></div>
+        <div class="text-center mb-2">
+          <div id="remaining-score" class="text-6xl font-black text-amber-400 tabular-nums tracking-tight">301</div>
+          <div id="current-player-name" class="text-lg font-medium text-white">Player 1</div>
+          <div id="turn-throws" class="text-sm text-slate-400 h-6 mt-1 font-mono"></div>
         </div>
         
         <!-- Board Container -->
-        <div id="board-container" class="w-full max-w-[280px] mx-auto flex-shrink-0"></div>
+        <div id="board-container" class="w-full max-w-[260px] mx-auto flex-shrink-0"></div>
         
-        <!-- Action Buttons -->
-        <div class="grid grid-cols-2 gap-2 mt-4 max-w-xs mx-auto w-full">
-          <button id="blank-btn"
-            class="py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
-            Miss
+        <!-- All Players Scoreboard -->
+        <div id="all-players-scores" class="flex justify-center gap-3 mt-3 flex-wrap px-2">
+          <!-- Player scores will be inserted here -->
+        </div>
+        
+        <!-- Compact Action Buttons -->
+        <div class="flex justify-center gap-3 mt-3 max-w-xs mx-auto w-full">
+          <button id="blank-btn" title="Miss"
+            class="w-14 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-2xl rounded-xl transition-all border border-slate-600">
+            0️⃣
           </button>
-          <button id="undo-btn" disabled
-            class="py-3 bg-red-600/80 hover:bg-red-500 active:bg-red-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all border border-red-500/50 disabled:border-slate-600">
-            Undo
+          <button id="undo-btn" disabled title="Undo"
+            class="w-14 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-2xl rounded-xl transition-all border border-slate-600">
+            ↩️
           </button>
-          <button id="player-list-btn"
-            class="py-3 px-4 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
-            Score
-          </button>
-          <button id="new-game-ingame-btn"
-            class="py-3 px-4 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
-            New Game
+          <button id="player-list-btn" title="Scores"
+            class="w-14 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-2xl rounded-xl transition-all border border-slate-600">
+            📊
           </button>
         </div>
         
         <!-- Status Message -->
-        <div id="game-message" class="text-center text-lg font-bold mt-3 h-8"></div>
+        <div id="game-message" class="text-center text-base font-bold mt-2 h-6"></div>
       </div>
 
     </main>
 
     <!-- Player List Modal -->
     <div id="player-list-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-      <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-white">Scores</h2>
-          <button id="close-player-list-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+      <div class="bg-slate-800 rounded-2xl p-4 w-full max-w-sm shadow-2xl border border-slate-700 max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-lg font-bold text-white">Scores</h2>
+          <div class="flex items-center gap-2">
+            <button id="all-scores-btn" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white text-xs font-medium rounded-lg transition-all">
+              All Games
+            </button>
+            <button id="close-player-list-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+          </div>
         </div>
-        <div id="modal-player-scores" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+        <div id="modal-player-scores" class="space-y-2 overflow-y-auto flex-1 pr-1">
           <!-- Player scores will be inserted here -->
         </div>
-        <button id="new-game-btn" class="w-full mt-5 py-3.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
+        <button id="new-game-btn" class="w-full mt-4 py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
           New Game
+        </button>
+      </div>
+    </div>
+
+    <!-- All Scores History Modal -->
+    <div id="all-scores-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-4 w-full max-w-md shadow-2xl border border-slate-700 max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-lg font-bold text-white">Game History</h2>
+          <button id="close-all-scores-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+        </div>
+        <div id="all-scores-content" class="overflow-y-auto flex-1">
+          <!-- Game history table will be inserted here -->
+        </div>
+        <button id="back-to-scores-btn" class="w-full mt-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all border border-slate-600">
+          Back to Scores
         </button>
       </div>
     </div>
@@ -169,10 +213,15 @@
       <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-amber-500/30 text-center">
         <div class="text-7xl mb-4 animate-bounce">🏆</div>
         <h2 class="text-2xl font-bold text-amber-400 mb-2">Winner!</h2>
-        <div id="winner-name" class="text-4xl font-black text-white mb-8">Player 1</div>
-        <button id="winner-new-game-btn" class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-lg">
-          New Game
-        </button>
+        <div id="winner-name" class="text-4xl font-black text-white mb-6">Player 1</div>
+        <div class="flex flex-col gap-3">
+          <button id="winner-same-players-btn" class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-lg">
+            Play Again
+          </button>
+          <button id="winner-start-fresh-btn" class="w-full py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
+            Start Fresh
+          </button>
+        </div>
       </div>
     </div>
 
@@ -192,6 +241,44 @@
             Cancel
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="counter-settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-white">Game Settings</h2>
+          <button id="close-settings-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+        </div>
+        
+        <!-- Current Game Info (read-only) -->
+        <div class="space-y-3 mb-4">
+          <div class="flex items-center justify-between py-2 px-3 bg-slate-700/50 rounded-lg">
+            <span class="text-sm text-slate-400">Starting Score</span>
+            <span id="settings-starting-score" class="text-sm font-bold text-white">301</span>
+          </div>
+          <div class="flex items-center justify-between py-2 px-3 bg-slate-700/50 rounded-lg">
+            <span class="text-sm text-slate-400">Double Out</span>
+            <span id="settings-double-out" class="text-sm font-medium text-emerald-400">Yes</span>
+          </div>
+        </div>
+        
+        <!-- Mental Math Toggle (can be changed) -->
+        <div class="flex items-center justify-between py-3 px-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
+          <div>
+            <label class="text-sm font-medium text-white">Mental Math</label>
+            <p class="text-xs text-slate-500 mt-0.5">Only shows total – you subtract</p>
+          </div>
+          <button id="settings-mental-math-toggle" type="button" data-enabled="false"
+            class="relative w-12 h-7 rounded-full bg-slate-600 transition-colors focus:outline-none flex-shrink-0">
+            <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform shadow-lg"></span>
+          </button>
+        </div>
+        
+        <button id="close-settings-btn" class="w-full mt-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all border border-slate-600">
+          Close
+        </button>
       </div>
     </div>
 

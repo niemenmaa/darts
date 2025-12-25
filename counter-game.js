@@ -28,6 +28,11 @@ export {
 };
 
 const COUNTER_COOKIE_NAME = 'dartsCounterGame';
+const HISTORY_COOKIE_NAME = 'dartsGameHistory';
+const MAX_HISTORY_GAMES = 25;
+
+// Game history - persisted across sessions
+let gameHistory = [];
 
 // Game state
 let gameState = {
@@ -102,9 +107,241 @@ function loadSettings() {
     }
 }
 
+// Save game history to cookie
+function saveGameHistory() {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const value = encodeURIComponent(JSON.stringify(gameHistory));
+    document.cookie = `${HISTORY_COOKIE_NAME}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+}
+
+// Load game history from cookie
+function loadGameHistory() {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === HISTORY_COOKIE_NAME) {
+            try {
+                const saved = JSON.parse(decodeURIComponent(value));
+                if (Array.isArray(saved)) {
+                    gameHistory = saved;
+                    return true;
+                }
+            } catch (e) {
+                console.error('Failed to parse game history cookie:', e);
+            }
+        }
+    }
+    return false;
+}
+
+// Add completed game to history
+function addGameToHistory() {
+    const game = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        startingScore: gameState.startingScore,
+        doubleOut: gameState.doubleOut,
+        players: gameState.players.map(player => ({
+            name: player.name,
+            won: player.score === 0,
+            finalScore: player.score,
+            rounds: [...player.history]
+        }))
+    };
+    
+    gameHistory.unshift(game);
+    
+    // Keep only last MAX_HISTORY_GAMES
+    if (gameHistory.length > MAX_HISTORY_GAMES) {
+        gameHistory = gameHistory.slice(0, MAX_HISTORY_GAMES);
+    }
+    
+    saveGameHistory();
+}
+
+// Get game history
+export function getGameHistory() {
+    return [...gameHistory];
+}
+
+// Clear game history
+export function clearGameHistory() {
+    gameHistory = [];
+    document.cookie = `${HISTORY_COOKIE_NAME}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+}
+
+// ==========================================
+// Statistics Calculation Functions
+// ==========================================
+
+// Calculate points per turn (3 darts) from rounds
+export function getPointsPerTurn(rounds) {
+    if (!rounds || rounds.length === 0) return 0;
+    
+    let totalPoints = 0;
+    let validRounds = 0;
+    
+    for (const round of rounds) {
+        if (!round.bust) {
+            const turnPoints = round.throws.reduce((sum, t) => sum + t.value, 0);
+            totalPoints += turnPoints;
+            validRounds++;
+        }
+    }
+    
+    return validRounds > 0 ? totalPoints / validRounds : 0;
+}
+
+// Calculate points per dart from rounds
+export function getPointsPerDart(rounds) {
+    if (!rounds || rounds.length === 0) return 0;
+    
+    let totalPoints = 0;
+    let totalDarts = 0;
+    
+    for (const round of rounds) {
+        for (const dart of round.throws) {
+            totalPoints += dart.value;
+            totalDarts++;
+        }
+    }
+    
+    return totalDarts > 0 ? totalPoints / totalDarts : 0;
+}
+
+// Count turns with 100+ points
+export function getHundredPlusCount(rounds) {
+    if (!rounds || rounds.length === 0) return 0;
+    
+    return rounds.filter(round => {
+        if (round.bust) return false;
+        const turnPoints = round.throws.reduce((sum, t) => sum + t.value, 0);
+        return turnPoints >= 100;
+    }).length;
+}
+
+// Calculate doubles percentage (doubles hit / doubles attempted)
+export function getDoublesPercentage(rounds) {
+    if (!rounds || rounds.length === 0) return 0;
+    
+    let doublesAttempted = 0;
+    let doublesHit = 0;
+    
+    for (const round of rounds) {
+        for (const dart of round.throws) {
+            // Count doubles attempted (D prefix or bull 50)
+            if (dart.text.startsWith('D') || dart.value === 50) {
+                doublesAttempted++;
+                doublesHit++;
+            }
+        }
+    }
+    
+    // For a more accurate metric, we'd need to track attempted doubles that missed
+    // For now, we just return 100% if any doubles were hit
+    return doublesAttempted > 0 ? 100 : 0;
+}
+
+// Calculate first 9 darts average (first 3 turns)
+export function getFirstNineAverage(rounds) {
+    if (!rounds || rounds.length === 0) return 0;
+    
+    const first3Rounds = rounds.slice(0, 3);
+    let totalPoints = 0;
+    let totalDarts = 0;
+    
+    for (const round of first3Rounds) {
+        for (const dart of round.throws) {
+            totalPoints += dart.value;
+            totalDarts++;
+        }
+    }
+    
+    // Return average per 3 darts (turn), scaled to 9 darts
+    return totalDarts > 0 ? (totalPoints / totalDarts) * 3 : 0;
+}
+
+// Get total points scored in a game by a player
+export function getTotalPointsScored(rounds, startingScore) {
+    if (!rounds || rounds.length === 0) return 0;
+    
+    let totalPoints = 0;
+    for (const round of rounds) {
+        if (!round.bust) {
+            const turnPoints = round.throws.reduce((sum, t) => sum + t.value, 0);
+            totalPoints += turnPoints;
+        }
+    }
+    
+    return totalPoints;
+}
+
+// Calculate aggregate stats for a player across all games
+export function calculatePlayerStats(playerName) {
+    const playerGames = gameHistory.filter(game => 
+        game.players.some(p => p.name === playerName)
+    );
+    
+    if (playerGames.length === 0) {
+        return {
+            gamesPlayed: 0,
+            gamesWon: 0,
+            winRate: 0,
+            avgPerTurn: 0,
+            avgPerDart: 0,
+            hundredPlusCount: 0,
+            firstNineAvg: 0
+        };
+    }
+    
+    let totalRounds = [];
+    let gamesWon = 0;
+    
+    for (const game of playerGames) {
+        const playerData = game.players.find(p => p.name === playerName);
+        if (playerData) {
+            totalRounds = totalRounds.concat(playerData.rounds);
+            if (playerData.won) gamesWon++;
+        }
+    }
+    
+    return {
+        gamesPlayed: playerGames.length,
+        gamesWon,
+        winRate: (gamesWon / playerGames.length) * 100,
+        avgPerTurn: getPointsPerTurn(totalRounds),
+        avgPerDart: getPointsPerDart(totalRounds),
+        hundredPlusCount: getHundredPlusCount(totalRounds),
+        firstNineAvg: getFirstNineAverage(totalRounds)
+    };
+}
+
+// Get current game stats for a player
+export function getCurrentGameStats(player) {
+    if (!player || !player.history) {
+        return {
+            avgPerTurn: 0,
+            avgPerDart: 0,
+            hundredPlusCount: 0,
+            firstNineAvg: 0,
+            totalPointsScored: 0
+        };
+    }
+    
+    return {
+        avgPerTurn: getPointsPerTurn(player.history),
+        avgPerDart: getPointsPerDart(player.history),
+        hundredPlusCount: getHundredPlusCount(player.history),
+        firstNineAvg: getFirstNineAverage(player.history),
+        totalPointsScored: getTotalPointsScored(player.history, gameState.startingScore)
+    };
+}
+
 // Initialize - load saved game if exists
 loadSettings();
 loadGameState();
+loadGameHistory();
 
 // Export game state getters
 export function getGameState() {
@@ -133,6 +370,11 @@ export function getWinner() {
 
 export function isMentalMathMode() {
     return gameState.mentalMathMode;
+}
+
+export function setMentalMathMode(enabled) {
+    gameState.mentalMathMode = enabled;
+    saveGameState();
 }
 
 // Player management
@@ -341,6 +583,9 @@ function handleWin() {
     // Set winner
     gameState.winner = player;
     saveGameState();
+    
+    // Save completed game to history
+    addGameToHistory();
     
     return { success: true, bust: false, win: true, message: `${player.name} wins!` };
 }

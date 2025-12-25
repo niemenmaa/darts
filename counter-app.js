@@ -14,6 +14,7 @@ import {
     isGameStarted,
     getWinner,
     isMentalMathMode,
+    setMentalMathMode,
     addPlayer,
     removePlayer,
     updatePlayer,
@@ -35,7 +36,14 @@ import {
     slideInSector,
     resetActiveSector,
     hasSavedGame,
-    clearSavedGame
+    clearSavedGame,
+    getGameHistory,
+    getCurrentGameStats,
+    calculatePlayerStats,
+    getPointsPerTurn,
+    getPointsPerDart,
+    getHundredPlusCount,
+    getFirstNineAverage
 } from './counter-game.js';
 import './style.css';
 
@@ -96,6 +104,8 @@ function init() {
 function setupMenu() {
     const menuBtn = document.getElementById('menu-btn');
     const menuDropdown = document.getElementById('menu-dropdown');
+    const menuSettingsBtn = document.getElementById('menu-settings-btn');
+    const menuNewGameBtn = document.getElementById('menu-new-game-btn');
     
     // Toggle menu
     menuBtn.addEventListener('click', (e) => {
@@ -108,6 +118,18 @@ function setupMenu() {
         if (!menuDropdown.contains(e.target) && e.target !== menuBtn) {
             menuDropdown.classList.add('hidden');
         }
+    });
+    
+    // Menu Settings button
+    menuSettingsBtn.addEventListener('click', () => {
+        menuDropdown.classList.add('hidden');
+        openSettingsModal();
+    });
+    
+    // Menu New Game button
+    menuNewGameBtn.addEventListener('click', () => {
+        menuDropdown.classList.add('hidden');
+        openNewGameModal();
     });
 }
 
@@ -129,10 +151,19 @@ function showScreen(screenName) {
         gameSetupScreen.classList.remove('hidden');
         updateModeButtons();
         updateDoubleOutToggle();
+        updateMentalMathToggle();
         renderPlayerOrderList();
     } else if (screenName === 'game-play') {
         gamePlayScreen.classList.remove('hidden');
         updateGameUI();
+    }
+    
+    // Show/hide menu game options based on screen
+    const menuGameOptions = document.getElementById('menu-game-options');
+    if (screenName === 'game-play') {
+        menuGameOptions.classList.remove('hidden');
+    } else {
+        menuGameOptions.classList.add('hidden');
     }
 }
 
@@ -266,6 +297,7 @@ function setupGameSetupScreen() {
     const mode301Btn = document.getElementById('mode-301-btn');
     const mode501Btn = document.getElementById('mode-501-btn');
     const doubleOutToggle = document.getElementById('double-out-toggle');
+    const mentalMathToggle = document.getElementById('mental-math-toggle');
     const backToPlayersBtn = document.getElementById('back-to-players-btn');
     const startGameBtn = document.getElementById('start-game-btn');
     
@@ -285,6 +317,13 @@ function setupGameSetupScreen() {
         const currentState = doubleOutToggle.dataset.enabled === 'true';
         setDoubleOut(!currentState);
         updateDoubleOutToggle();
+    });
+    
+    // Mental math toggle
+    mentalMathToggle.addEventListener('click', () => {
+        const currentState = mentalMathToggle.dataset.enabled === 'true';
+        setMentalMathMode(!currentState);
+        updateMentalMathToggle();
     });
     
     // Navigation
@@ -322,13 +361,32 @@ function updateDoubleOutToggle() {
     toggle.dataset.enabled = String(enabled);
     
     if (enabled) {
-        toggle.classList.remove('bg-slate-600', 'border-slate-500');
-        toggle.classList.add('bg-emerald-500', 'border-emerald-400');
-        knob.classList.add('translate-x-6');
+        toggle.classList.remove('bg-slate-600');
+        toggle.classList.add('bg-emerald-500');
+        knob.classList.add('translate-x-5');
     } else {
-        toggle.classList.add('bg-slate-600', 'border-slate-500');
-        toggle.classList.remove('bg-emerald-500', 'border-emerald-400');
-        knob.classList.remove('translate-x-6');
+        toggle.classList.add('bg-slate-600');
+        toggle.classList.remove('bg-emerald-500');
+        knob.classList.remove('translate-x-5');
+    }
+}
+
+function updateMentalMathToggle() {
+    const toggle = document.getElementById('mental-math-toggle');
+    if (!toggle) return;
+    const knob = toggle.querySelector('span');
+    const enabled = isMentalMathMode();
+    
+    toggle.dataset.enabled = String(enabled);
+    
+    if (enabled) {
+        toggle.classList.remove('bg-slate-600');
+        toggle.classList.add('bg-emerald-500');
+        knob.classList.add('translate-x-5');
+    } else {
+        toggle.classList.add('bg-slate-600');
+        toggle.classList.remove('bg-emerald-500');
+        knob.classList.remove('translate-x-5');
     }
 }
 
@@ -381,7 +439,6 @@ function setupGamePlayScreen() {
     const blankBtn = document.getElementById('blank-btn');
     const undoBtn = document.getElementById('undo-btn');
     const playerListBtn = document.getElementById('player-list-btn');
-    const newGameIngameBtn = document.getElementById('new-game-ingame-btn');
     
     // Blank throw (0 points)
     blankBtn.addEventListener('click', () => {
@@ -399,11 +456,6 @@ function setupGamePlayScreen() {
     // Open player list modal
     playerListBtn.addEventListener('click', () => {
         openPlayerListModal();
-    });
-    
-    // Open new game confirmation modal
-    newGameIngameBtn.addEventListener('click', () => {
-        openNewGameModal();
     });
 }
 
@@ -570,6 +622,32 @@ function updateGameUI() {
     // Update undo button state
     const undoBtn = document.getElementById('undo-btn');
     undoBtn.disabled = throws.length === 0;
+    
+    // Update all players scoreboard
+    updateAllPlayersScoreboard();
+}
+
+function updateAllPlayersScoreboard() {
+    const container = document.getElementById('all-players-scores');
+    const players = getPlayers();
+    const currentPlayer = getCurrentPlayer();
+    
+    if (players.length <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.innerHTML = players.map(player => {
+        const isCurrent = currentPlayer && player.name === currentPlayer.name;
+        const isWinner = player.score === 0;
+        
+        return `
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg ${isCurrent ? 'bg-amber-500/30 ring-1 ring-amber-500/50' : 'bg-slate-800/60'}">
+                <span class="text-xs font-medium ${isCurrent ? 'text-amber-300' : 'text-slate-400'} truncate max-w-16">${escapeHtml(player.name)}</span>
+                <span class="text-sm font-bold tabular-nums ${isWinner ? 'text-emerald-400' : isCurrent ? 'text-amber-400' : 'text-white'}">${player.score}</span>
+            </div>
+        `;
+    }).join('');
 }
 
 function showGameMessage(message, colorClass = 'text-slate-400') {
@@ -591,6 +669,7 @@ function setupModals() {
     const closePlayerListModal = document.getElementById('close-player-list-modal');
     const playerListModal = document.getElementById('player-list-modal');
     const newGameBtn = document.getElementById('new-game-btn');
+    const allScoresBtn = document.getElementById('all-scores-btn');
     
     closePlayerListModal.addEventListener('click', () => {
         playerListModal.classList.add('hidden');
@@ -610,14 +689,52 @@ function setupModals() {
         openNewGameModal();
     });
     
+    allScoresBtn.addEventListener('click', () => {
+        playerListModal.classList.add('hidden');
+        playerListModal.classList.remove('flex');
+        openAllScoresModal();
+    });
+    
+    // All Scores modal
+    const allScoresModal = document.getElementById('all-scores-modal');
+    const closeAllScoresModal = document.getElementById('close-all-scores-modal');
+    const backToScoresBtn = document.getElementById('back-to-scores-btn');
+    
+    closeAllScoresModal.addEventListener('click', () => {
+        allScoresModal.classList.add('hidden');
+        allScoresModal.classList.remove('flex');
+    });
+    
+    backToScoresBtn.addEventListener('click', () => {
+        allScoresModal.classList.add('hidden');
+        allScoresModal.classList.remove('flex');
+        openPlayerListModal();
+    });
+    
+    allScoresModal.addEventListener('click', (e) => {
+        if (e.target === allScoresModal) {
+            allScoresModal.classList.add('hidden');
+            allScoresModal.classList.remove('flex');
+        }
+    });
+    
     // Winner modal
     const winnerModal = document.getElementById('winner-modal');
-    const winnerNewGameBtn = document.getElementById('winner-new-game-btn');
+    const winnerSamePlayersBtn = document.getElementById('winner-same-players-btn');
+    const winnerStartFreshBtn = document.getElementById('winner-start-fresh-btn');
     
-    winnerNewGameBtn.addEventListener('click', () => {
+    winnerSamePlayersBtn.addEventListener('click', () => {
         winnerModal.classList.add('hidden');
         winnerModal.classList.remove('flex');
-        openNewGameModal();
+        resetGame();
+        showScreen('game-setup');
+    });
+    
+    winnerStartFreshBtn.addEventListener('click', () => {
+        winnerModal.classList.add('hidden');
+        winnerModal.classList.remove('flex');
+        fullReset();
+        showScreen('player-setup');
     });
     
     // New game confirmation modal
@@ -651,6 +768,37 @@ function setupModals() {
             newGameModal.classList.remove('flex');
         }
     });
+    
+    // Settings modal
+    const settingsModal = document.getElementById('counter-settings-modal');
+    const closeSettingsModal = document.getElementById('close-settings-modal');
+    const closeSettingsBtn = document.getElementById('close-settings-btn');
+    const settingsMentalMathToggle = document.getElementById('settings-mental-math-toggle');
+    
+    closeSettingsModal.addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+    });
+    
+    closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+    });
+    
+    settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+            settingsModal.classList.add('hidden');
+            settingsModal.classList.remove('flex');
+        }
+    });
+    
+    // Mental math toggle in settings modal
+    settingsMentalMathToggle.addEventListener('click', () => {
+        const currentState = settingsMentalMathToggle.dataset.enabled === 'true';
+        setMentalMathMode(!currentState);
+        updateSettingsMentalMathToggle();
+        updateGameUI(); // Update display immediately
+    });
 }
 
 function openNewGameModal() {
@@ -659,8 +807,55 @@ function openNewGameModal() {
     modal.classList.add('flex');
 }
 
+function openSettingsModal() {
+    const modal = document.getElementById('counter-settings-modal');
+    
+    // Update displayed settings
+    const startingScoreEl = document.getElementById('settings-starting-score');
+    const doubleOutEl = document.getElementById('settings-double-out');
+    
+    startingScoreEl.textContent = getStartingScore();
+    doubleOutEl.textContent = getDoubleOut() ? 'Yes' : 'No';
+    doubleOutEl.className = `text-sm font-medium ${getDoubleOut() ? 'text-emerald-400' : 'text-slate-400'}`;
+    
+    // Update mental math toggle state
+    updateSettingsMentalMathToggle();
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function updateSettingsMentalMathToggle() {
+    const toggle = document.getElementById('settings-mental-math-toggle');
+    if (!toggle) return;
+    const knob = toggle.querySelector('span');
+    const enabled = isMentalMathMode();
+    
+    toggle.dataset.enabled = String(enabled);
+    
+    if (enabled) {
+        toggle.classList.remove('bg-slate-600');
+        toggle.classList.add('bg-emerald-500');
+        knob.classList.add('translate-x-5');
+    } else {
+        toggle.classList.add('bg-slate-600');
+        toggle.classList.remove('bg-emerald-500');
+        knob.classList.remove('translate-x-5');
+    }
+}
+
+// Track expanded player in modal
+let expandedPlayerIndex = null;
+
 function openPlayerListModal() {
     const modal = document.getElementById('player-list-modal');
+    expandedPlayerIndex = null;
+    renderPlayerScoresModal();
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function renderPlayerScoresModal() {
     const scoresContainer = document.getElementById('modal-player-scores');
     const players = getPlayers();
     const currentPlayer = getCurrentPlayer();
@@ -668,21 +863,59 @@ function openPlayerListModal() {
     scoresContainer.innerHTML = players.map((player, index) => {
         const isCurrent = currentPlayer && player.name === currentPlayer.name;
         const isWinner = player.score === 0;
-        return `
-            <div class="flex items-center justify-between p-3 rounded-xl transition-all ${isCurrent ? 'bg-amber-500/20 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}">
-                <div class="flex items-center gap-3">
-                    <span class="w-8 h-8 flex items-center justify-center ${isCurrent ? 'bg-gradient-to-br from-amber-500 to-amber-600' : 'bg-slate-600'} text-${isCurrent ? 'slate-900' : 'white'} font-bold rounded-lg text-sm">
-                        ${index + 1}
-                    </span>
-                    <span class="text-white font-medium">${escapeHtml(player.name)}</span>
+        const isExpanded = expandedPlayerIndex === index;
+        const stats = getCurrentGameStats(player);
+        
+        // Build rounds display
+        let roundsHtml = '';
+        if (isExpanded && player.history && player.history.length > 0) {
+            roundsHtml = `
+                <div class="mt-2 pt-2 border-t border-slate-600/50">
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-2">
+                        <div class="text-slate-400">AVG/turn: <span class="text-white font-medium">${stats.avgPerTurn.toFixed(1)}</span></div>
+                        <div class="text-slate-400">AVG/dart: <span class="text-white font-medium">${stats.avgPerDart.toFixed(1)}</span></div>
+                        <div class="text-slate-400">100+: <span class="text-white font-medium">${stats.hundredPlusCount}</span></div>
+                        <div class="text-slate-400">First 9: <span class="text-white font-medium">${stats.firstNineAvg.toFixed(1)}</span></div>
+                    </div>
+                    <div class="text-xs text-slate-500 mb-1">Rounds:</div>
+                    <div class="flex flex-wrap gap-1">
+                        ${player.history.map((round, i) => {
+                            const turnTotal = round.throws.reduce((s, t) => s + t.value, 0);
+                            const throwsStr = round.throws.map(t => t.text).join('-');
+                            return `<span class="px-1.5 py-0.5 rounded text-xs ${round.bust ? 'bg-red-900/50 text-red-300' : turnTotal >= 100 ? 'bg-emerald-900/50 text-emerald-300' : 'bg-slate-700 text-slate-300'}" title="${throwsStr}">${turnTotal}${round.bust ? '✗' : ''}</span>`;
+                        }).join('')}
+                    </div>
                 </div>
-                <span class="text-2xl font-bold tabular-nums ${isWinner ? 'text-emerald-400' : 'text-white'}">${player.score}</span>
+            `;
+        } else if (isExpanded) {
+            roundsHtml = `<div class="mt-2 pt-2 border-t border-slate-600/50 text-xs text-slate-500">No throws yet</div>`;
+        }
+        
+        return `
+            <div class="player-score-card rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-amber-500/20 ring-1 ring-amber-500/50' : 'bg-slate-700/50 hover:bg-slate-700/70'}" data-player-index="${index}">
+                <div class="flex items-center justify-between p-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-slate-500 text-sm">${isExpanded ? '▼' : '▶'}</span>
+                        <span class="w-7 h-7 flex items-center justify-center ${isCurrent ? 'bg-gradient-to-br from-amber-500 to-amber-600' : 'bg-slate-600'} text-${isCurrent ? 'slate-900' : 'white'} font-bold rounded-md text-xs">
+                            ${index + 1}
+                        </span>
+                        <span class="text-white font-medium text-sm">${escapeHtml(player.name)}</span>
+                    </div>
+                    <span class="text-xl font-bold tabular-nums ${isWinner ? 'text-emerald-400' : 'text-white'}">${player.score}</span>
+                </div>
+                ${roundsHtml}
             </div>
         `;
     }).join('');
     
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    // Add click handlers for expanding/collapsing
+    scoresContainer.querySelectorAll('.player-score-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const index = parseInt(card.dataset.playerIndex);
+            expandedPlayerIndex = expandedPlayerIndex === index ? null : index;
+            renderPlayerScoresModal();
+        });
+    });
 }
 
 function showWinnerModal() {
@@ -693,6 +926,117 @@ function showWinnerModal() {
     const winnerName = document.getElementById('winner-name');
     
     winnerName.textContent = winner.name;
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function openAllScoresModal() {
+    const modal = document.getElementById('all-scores-modal');
+    const content = document.getElementById('all-scores-content');
+    const history = getGameHistory();
+    
+    if (history.length === 0) {
+        content.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-slate-400 py-12">
+                <div class="text-5xl mb-3 opacity-40">📊</div>
+                <p class="text-base font-medium">No games played yet</p>
+                <p class="text-sm text-slate-500 mt-1">Complete a game to see history</p>
+            </div>
+        `;
+    } else {
+        // Get all unique player names from history
+        const allPlayerNames = new Set();
+        history.forEach(game => {
+            game.players.forEach(p => allPlayerNames.add(p.name));
+        });
+        const playerNames = Array.from(allPlayerNames);
+        
+        // Build table
+        let tableHtml = `
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-600">
+                            <th class="text-left py-2 px-2 text-slate-400 font-medium text-xs">Game</th>
+                            ${playerNames.map(name => `<th class="text-center py-2 px-2 text-slate-400 font-medium text-xs truncate max-w-20">${escapeHtml(name)}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        history.forEach((game, i) => {
+            const gameNum = history.length - i;
+            const date = new Date(game.timestamp);
+            const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
+            
+            tableHtml += `
+                <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                    <td class="py-2 px-2">
+                        <div class="text-white font-medium">#${gameNum}</div>
+                        <div class="text-xs text-slate-500">${game.startingScore} • ${dateStr}</div>
+                    </td>
+            `;
+            
+            playerNames.forEach(name => {
+                const playerData = game.players.find(p => p.name === name);
+                if (playerData) {
+                    const totalScored = playerData.rounds.reduce((sum, r) => {
+                        if (!r.bust) {
+                            return sum + r.throws.reduce((s, t) => s + t.value, 0);
+                        }
+                        return sum;
+                    }, 0);
+                    
+                    tableHtml += `
+                        <td class="py-2 px-2 text-center">
+                            <span class="font-bold tabular-nums ${playerData.won ? 'text-emerald-400' : 'text-white'}">${totalScored}</span>
+                            ${playerData.won ? '<span class="text-emerald-400 ml-1">✓</span>' : ''}
+                        </td>
+                    `;
+                } else {
+                    tableHtml += `<td class="py-2 px-2 text-center text-slate-600">-</td>`;
+                }
+            });
+            
+            tableHtml += `</tr>`;
+        });
+        
+        tableHtml += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // Add player stats summary
+        let statsHtml = `
+            <div class="mt-4 pt-4 border-t border-slate-700">
+                <h3 class="text-sm font-medium text-slate-400 mb-2">Player Statistics</h3>
+                <div class="space-y-2">
+        `;
+        
+        playerNames.forEach(name => {
+            const stats = calculatePlayerStats(name);
+            statsHtml += `
+                <div class="bg-slate-700/50 rounded-lg p-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-white font-medium text-sm">${escapeHtml(name)}</span>
+                        <span class="text-xs text-slate-400">${stats.gamesWon}/${stats.gamesPlayed} wins (${stats.winRate.toFixed(0)}%)</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2 text-xs">
+                        <div class="text-slate-400">AVG/T: <span class="text-white">${stats.avgPerTurn.toFixed(1)}</span></div>
+                        <div class="text-slate-400">AVG/D: <span class="text-white">${stats.avgPerDart.toFixed(1)}</span></div>
+                        <div class="text-slate-400">100+: <span class="text-white">${stats.hundredPlusCount}</span></div>
+                        <div class="text-slate-400">F9: <span class="text-white">${stats.firstNineAvg.toFixed(1)}</span></div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        statsHtml += `</div></div>`;
+        
+        content.innerHTML = tableHtml + statsHtml;
+    }
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
