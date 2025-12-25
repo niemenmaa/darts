@@ -10,14 +10,27 @@
   
   <div class="container mx-auto px-3 py-3 h-full flex flex-col">
     <header class="text-center mb-2 relative">
-      <button id="settings-btn" class="absolute right-0 top-0 p-2 text-xl text-slate-400 hover:text-white transition-colors">
-        ⚙️
+      <button id="menu-btn" class="absolute left-0 top-0 p-2 text-xl text-slate-400 hover:text-white transition-colors">
+        ☰
       </button>
       <h1 class="text-2xl font-bold bg-gradient-to-r from-primary-400 to-emerald-300 bg-clip-text text-transparent">
-        Darts Endings
+        Endings
       </h1>
-      <p class="text-slate-500 text-xs">Normal = tap/click , D = slide out, T = slide in</p>
+      <p class="text-slate-500 text-xs">tap = single, slide out = D, slide in = T</p>
     </header>
+
+    <!-- Menu Dropdown -->
+    <div id="menu-dropdown" class="absolute left-3 top-12 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 z-40 hidden min-w-48 overflow-hidden">
+      <a href="./counter.html" class="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+        <span class="text-lg">🎯</span>
+        <span>Counter Mode</span>
+      </a>
+      <div class="border-t border-slate-700"></div>
+      <button id="settings-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+        <span class="text-lg">⚙️</span>
+        <span>Settings</span>
+      </button>
+    </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center">

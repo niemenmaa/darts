@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Darts Counter</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="w-screen overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+  
+  <div class="container mx-auto px-4 py-4 h-full flex flex-col max-w-lg">
+    <header class="text-center mb-4 relative">
+      <button id="menu-btn" class="absolute left-0 top-1/2 -translate-y-1/2 p-2 text-xl text-slate-400 hover:text-white transition-colors">
+        ☰
+      </button>
+      <h1 class="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-300 bg-clip-text text-transparent">
+        Counter
+      </h1>
+    </header>
+
+    <!-- Menu Dropdown -->
+    <div id="menu-dropdown" class="absolute left-4 top-14 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 z-40 hidden min-w-48 overflow-hidden">
+      <a href="./index.html" class="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+        <span class="text-lg">🎯</span>
+        <span>Endings Practice</span>
+      </a>
+    </div>
+
+    <main id="app" class="flex-1 overflow-hidden flex flex-col">
+      
+      <!-- Screen 1: Player Setup -->
+      <div id="player-setup-screen" class="flex flex-col h-full">
+        <div class="text-center mb-5">
+          <h2 class="text-lg font-medium text-slate-300">Add Players</h2>
+        </div>
+        
+        <!-- Add Player Form -->
+        <div class="flex gap-3 mb-6">
+          <input type="text" id="player-name-input" placeholder="Enter player name..." 
+            class="min-w-0 flex-1 px-4 py-3 text-base bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
+          <button id="add-player-btn" class="flex-shrink-0 px-6 py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 text-base font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
+            Add
+          </button>
+        </div>
+        
+        <!-- Player List -->
+        <div id="player-list" class="flex-1 overflow-y-auto space-y-2 mb-5 pr-1">
+          <!-- Player cards will be inserted here -->
+        </div>
+        
+        <!-- Continue Button -->
+        <button id="to-game-setup-btn" disabled
+          class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-900 disabled:text-slate-400 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:shadow-none text-lg">
+          Continue
+        </button>
+      </div>
+
+      <!-- Screen 2: Game Mode Selection -->
+      <div id="game-setup-screen" class="hidden flex flex-col h-full">
+        <div class="text-center mb-6">
+          <h2 class="text-lg font-medium text-slate-300">Game Setup</h2>
+        </div>
+        
+        <!-- Game Mode Selection -->
+        <div class="mb-6">
+          <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-3 text-center">Starting Score</label>
+          <div class="flex gap-3 justify-center">
+            <button id="mode-301-btn" data-mode="301"
+              class="w-28 py-4 rounded-xl font-bold text-2xl transition-all bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30 scale-105">
+              301
+            </button>
+            <button id="mode-501-btn" data-mode="501"
+              class="w-28 py-4 rounded-xl font-bold text-2xl transition-all bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white">
+              501
+            </button>
+          </div>
+        </div>
+        
+        <!-- Double Out Toggle -->
+        <div class="flex items-center justify-between py-4 px-5 bg-slate-800/80 rounded-xl mb-6 border border-slate-700/50">
+          <div>
+            <label class="text-sm font-medium text-white">Double Out</label>
+            <p class="text-xs text-slate-500 mt-0.5">Must finish on a double</p>
+          </div>
+          <button id="double-out-toggle" type="button" data-enabled="true"
+            class="relative flex-shrink-0 rounded-full bg-emerald-500 transition-all focus:outline-none border-2 border-emerald-400"
+            style="width: 56px; height: 32px; min-width: 56px;">
+            <span class="absolute left-0.5 top-0.5 w-6 h-6 bg-white rounded-full transition-transform translate-x-6 shadow-lg"></span>
+          </button>
+        </div>
+        
+        <!-- Player Order -->
+        <div class="flex-1 overflow-hidden flex flex-col mb-6">
+          <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Player Order</label>
+          <div id="player-order-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+            <!-- Reorderable player list will be inserted here -->
+          </div>
+        </div>
+        
+        <!-- Navigation Buttons -->
+        <div class="flex gap-3">
+          <button id="back-to-players-btn"
+            class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all">
+            ← Back
+          </button>
+          <button id="start-game-btn"
+            class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-lg">
+            Start
+          </button>
+        </div>
+      </div>
+
+      <!-- Screen 3: Game Play -->
+      <div id="game-play-screen" class="hidden flex flex-col h-full">
+        <!-- Score Display -->
+        <div class="text-center mb-3">
+          <div id="remaining-score" class="text-7xl font-black text-amber-400 tabular-nums tracking-tight">301</div>
+          <div id="current-player-name" class="text-xl font-medium text-white mt-1">Player 1</div>
+          <div id="turn-throws" class="text-base text-slate-400 h-7 mt-2 font-mono"></div>
+        </div>
+        
+        <!-- Board Container -->
+        <div id="board-container" class="w-full max-w-[280px] mx-auto flex-shrink-0"></div>
+        
+        <!-- Action Buttons -->
+        <div class="flex gap-2 mt-4 max-w-xs mx-auto w-full">
+          <button id="blank-btn"
+            class="flex-1 py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
+            Miss
+          </button>
+          <button id="undo-btn" disabled
+            class="flex-1 py-3 bg-red-600/80 hover:bg-red-500 active:bg-red-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all border border-red-500/50 disabled:border-slate-600">
+            Undo
+          </button>
+          <button id="player-list-btn"
+            class="py-3 px-4 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
+            📋
+          </button>
+          <button id="new-game-ingame-btn"
+            class="py-3 px-4 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
+            🔄
+          </button>
+        </div>
+        
+        <!-- Status Message -->
+        <div id="game-message" class="text-center text-lg font-bold mt-3 h-8"></div>
+      </div>
+
+    </main>
+
+    <!-- Player List Modal -->
+    <div id="player-list-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-white">Scores</h2>
+          <button id="close-player-list-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+        </div>
+        <div id="modal-player-scores" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+          <!-- Player scores will be inserted here -->
+        </div>
+        <button id="new-game-btn" class="w-full mt-5 py-3.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
+          New Game
+        </button>
+      </div>
+    </div>
+
+    <!-- Winner Modal -->
+    <div id="winner-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-amber-500/30 text-center">
+        <div class="text-7xl mb-4 animate-bounce">🏆</div>
+        <h2 class="text-2xl font-bold text-amber-400 mb-2">Winner!</h2>
+        <div id="winner-name" class="text-4xl font-black text-white mb-8">Player 1</div>
+        <button id="winner-new-game-btn" class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-lg">
+          New Game
+        </button>
+      </div>
+    </div>
+
+    <!-- New Game Confirmation Modal -->
+    <div id="new-game-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-700">
+        <h2 class="text-xl font-bold text-white mb-2">New Game</h2>
+        <p class="text-slate-400 mb-6">Do you want to keep the current players?</p>
+        <div class="flex flex-col gap-3">
+          <button id="new-game-keep-players-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all">
+            Keep Players
+          </button>
+          <button id="new-game-clear-all-btn" class="w-full py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-semibold rounded-xl transition-all border border-slate-600">
+            Start Fresh
+          </button>
+          <button id="new-game-cancel-btn" class="w-full py-3 text-slate-400 hover:text-white font-medium transition-all">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="text-center mt-3 text-slate-600 text-xs">
+      <p>by aanau</p>
+    </footer>
+  </div>
+
+  <script type="module" src="./counter-app.js"></script>
+</body>
+</html>

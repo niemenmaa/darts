@@ -19,10 +19,32 @@ function init() {
   const board = buildBoard(sectors);
   document.getElementById('board-container').appendChild(board);
   setupBoardEventListeners();
+  setupMenu();
   setupSettingsModal();
   
   // Start first game
   generateTarget();
+}
+
+/**
+ * Setup hamburger menu
+ */
+function setupMenu() {
+  const menuBtn = document.getElementById('menu-btn');
+  const menuDropdown = document.getElementById('menu-dropdown');
+  
+  // Toggle menu
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle('hidden');
+  });
+  
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!menuDropdown.contains(e.target) && e.target !== menuBtn) {
+      menuDropdown.classList.add('hidden');
+    }
+  });
 }
 
 /**
@@ -79,6 +101,8 @@ function setupSettingsModal() {
   
   // Open modal
   settingsBtn.addEventListener('click', () => {
+    // Close menu dropdown
+    document.getElementById('menu-dropdown').classList.add('hidden');
     loadFormValues();
     settingsModal.classList.remove('hidden');
     settingsModal.classList.add('flex');

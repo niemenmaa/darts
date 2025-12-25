@@ -81,6 +81,8 @@ function applyMissChance(selection) {
     const isTriple = selection.text.startsWith('T');
     const isDouble = selection.text.startsWith('D') || selection.value === 50;
     const isBull = selection.value === 25 || selection.value === 50;
+    const isBull50 = selection.value === 50;
+    const isBull25 = selection.value === 25;
     
     // Get the base number
     let baseNumber;
@@ -92,9 +94,59 @@ function applyMissChance(selection) {
         baseNumber = selection.value;
     }
     
+    // Handle bull accuracy separately
+    if (isBull) {
+        // Bull 50 (inner bull / bullseye)
+        if (isBull50) {
+            // First check sector accuracy - miss = go to random sector (single)
+            if (settings.sectorAccuracy < 100) {
+                const sectorRoll = Math.random() * 100;
+                if (sectorRoll >= settings.sectorAccuracy) {
+                    // Miss to random sector (single)
+                    const randomSector = sectors[Math.floor(Math.random() * sectors.length)];
+                    actual.text = String(randomSector);
+                    actual.value = randomSector;
+                    wasMiss = true;
+                    missType = 'sector';
+                    return { original, actual, wasMiss, missType };
+                }
+            }
+            // If sector was hit, check ring accuracy - miss = becomes 25
+            if (settings.ringAccuracy < 100) {
+                const ringRoll = Math.random() * 100;
+                if (ringRoll >= settings.ringAccuracy) {
+                    actual.text = '25';
+                    actual.value = 25;
+                    wasMiss = true;
+                    missType = 'ring';
+                }
+            }
+        }
+        // 25 (outer bull)
+        else if (isBull25) {
+            // Check sector accuracy - miss = go to random sector OR rarely bull
+            if (settings.sectorAccuracy < 100) {
+                const sectorRoll = Math.random() * 100;
+                if (sectorRoll >= settings.sectorAccuracy) {
+                    wasMiss = true;
+                    missType = 'sector';
+                    // 15% chance to hit bull 50 instead, 85% chance to hit random sector
+                    if (Math.random() < 0.15) {
+                        actual.text = '50';
+                        actual.value = 50;
+                    } else {
+                        const randomSector = sectors[Math.floor(Math.random() * sectors.length)];
+                        actual.text = String(randomSector);
+                        actual.value = randomSector;
+                    }
+                }
+            }
+        }
+        return { original, actual, wasMiss, missType };
+    }
+    
     // Step 1: Check sector accuracy (miss = go to neighbor)
-    // Bulls can't miss to neighbor sector
-    if (!isBull && settings.sectorAccuracy < 100) {
+    if (settings.sectorAccuracy < 100) {
         const roll = Math.random() * 100;
         if (roll >= settings.sectorAccuracy) {
             // Miss sector - go to random neighbor
@@ -110,7 +162,7 @@ function applyMissChance(selection) {
     }
     
     // Step 2: Check ring accuracy for T/D throws (miss = becomes single)
-    if ((isTriple || (isDouble && !isBull)) && settings.ringAccuracy < 100) {
+    if ((isTriple || isDouble) && settings.ringAccuracy < 100) {
         const roll = Math.random() * 100;
         if (roll >= settings.ringAccuracy) {
             // Miss ring - becomes single
@@ -132,18 +184,6 @@ function applyMissChance(selection) {
         // Single throw - just update if sector changed
         actual.text = String(baseNumber);
         actual.value = baseNumber;
-    } else if (isBull) {
-        // Bull stays as is (no sector miss possible)
-        // But D50 could miss ring to become 25
-        if (selection.value === 50 && settings.ringAccuracy < 100) {
-            const roll = Math.random() * 100;
-            if (roll >= settings.ringAccuracy) {
-                actual.text = '25';
-                actual.value = 25;
-                wasMiss = true;
-                missType = 'ring';
-            }
-        }
     } else {
         // T/D with sector change but ring hit
         if (isTriple) {
@@ -163,12 +203,15 @@ function addBoardMarker(score, wasMiss) {
     const board = document.getElementById('board');
     if (!board) return;
     
+    // Check if it's a bull hit (score is a string like "25" or "50")
+    const isBull = score === '25' || score === '50';
+    
     // Find the sector element
     const sectorElements = board.querySelectorAll('[data-score]');
     let targetSector = null;
     
     // Handle bullseye
-    if (score === 25 || score === 50) {
+    if (isBull) {
         targetSector = board.querySelector('[data-score="50"]');
     } else {
         // Find sector by base number
@@ -188,10 +231,17 @@ function addBoardMarker(score, wasMiss) {
     marker.className = `dart-marker absolute w-3 h-3 rounded-full z-30 pointer-events-none ${wasMiss ? 'bg-yellow-400' : 'bg-white'} border-2 ${wasMiss ? 'border-yellow-600' : 'border-slate-600'}`;
     
     // Position marker
-    if (score === 25 || score === 50) {
-        // Bullseye - position near center
-        const offset = currentRoundThrows.length * 8 - 8;
-        marker.style.cssText = `top: 50%; left: 50%; transform: translate(calc(-50% + ${offset}px), -50%);`;
+    if (isBull) {
+        // Bullseye - position near center with slight offset for each dart
+        const dartIndex = currentRoundThrows.length - 1;
+        // Arrange in a small triangle pattern around center
+        const offsets = [
+            { x: 0, y: 0 },      // First dart: center
+            { x: -6, y: 4 },     // Second dart: bottom-left
+            { x: 6, y: 4 }       // Third dart: bottom-right
+        ];
+        const offset = offsets[dartIndex] || { x: 0, y: 0 };
+        marker.style.cssText = `top: 50%; left: 50%; transform: translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px));`;
     } else {
         // Sector - position in the visible area (outer ring area)
         const sectorIndex = sectors.indexOf(parseInt(targetSector.dataset.score));
