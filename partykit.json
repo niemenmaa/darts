@@ -1,0 +1,7 @@
+{
+  "$schema": "https://www.partykit.io/schema.json",
+  "name": "darts-counter",
+  "main": "party/darts.ts",
+  "compatibilityDate": "2024-01-01"
+}
+

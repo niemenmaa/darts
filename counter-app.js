@@ -43,8 +43,20 @@ import {
     getPointsPerTurn,
     getPointsPerDart,
     getHundredPlusCount,
-    getFirstNineAverage
+    getFirstNineAverage,
+    onStateChange,
+    getRawGameState,
+    applySyncedState
 } from './counter-game.js';
+import {
+    generateRoomCode,
+    connectToRoom,
+    broadcastState,
+    disconnect,
+    getConnectionStatus,
+    isInRoom,
+    getRoomCode
+} from './sync.js';
 import './style.css';
 
 // Screen elements
@@ -78,6 +90,7 @@ function init() {
     setupGameSetupScreen();
     setupGamePlayScreen();
     setupModals();
+    setupSync();
     
     // Check for saved game and restore appropriate screen
     if (isGameStarted()) {
@@ -98,12 +111,26 @@ function init() {
 }
 
 // ==========================================
+// Sync Setup
+// ==========================================
+
+function setupSync() {
+    // Register state change callback to broadcast changes
+    onStateChange((state) => {
+        if (isInRoom()) {
+            broadcastState(state);
+        }
+    });
+}
+
+// ==========================================
 // Menu
 // ==========================================
 
 function setupMenu() {
     const menuBtn = document.getElementById('menu-btn');
     const menuDropdown = document.getElementById('menu-dropdown');
+    const menuShareBtn = document.getElementById('menu-share-btn');
     const menuSettingsBtn = document.getElementById('menu-settings-btn');
     const menuNewGameBtn = document.getElementById('menu-new-game-btn');
     
@@ -118,6 +145,12 @@ function setupMenu() {
         if (!menuDropdown.contains(e.target) && e.target !== menuBtn) {
             menuDropdown.classList.add('hidden');
         }
+    });
+    
+    // Menu Share button
+    menuShareBtn.addEventListener('click', () => {
+        menuDropdown.classList.add('hidden');
+        openShareModal();
     });
     
     // Menu Settings button
@@ -799,12 +832,161 @@ function setupModals() {
         updateSettingsMentalMathToggle();
         updateGameUI(); // Update display immediately
     });
+    
+    // Share game modal
+    const shareModal = document.getElementById('share-game-modal');
+    const closeShareModal = document.getElementById('close-share-modal');
+    const closeShareBtn = document.getElementById('close-share-btn');
+    const createRoomBtn = document.getElementById('create-room-btn');
+    const joinRoomBtn = document.getElementById('join-room-btn');
+    const joinRoomInput = document.getElementById('join-room-input');
+    const disconnectBtn = document.getElementById('disconnect-btn');
+    
+    closeShareModal.addEventListener('click', () => {
+        shareModal.classList.add('hidden');
+        shareModal.classList.remove('flex');
+    });
+    
+    closeShareBtn.addEventListener('click', () => {
+        shareModal.classList.add('hidden');
+        shareModal.classList.remove('flex');
+    });
+    
+    shareModal.addEventListener('click', (e) => {
+        if (e.target === shareModal) {
+            shareModal.classList.add('hidden');
+            shareModal.classList.remove('flex');
+        }
+    });
+    
+    createRoomBtn.addEventListener('click', () => {
+        const roomCode = generateRoomCode();
+        connectToRoom(roomCode, handleSyncedState, handleConnectionChange);
+        // Broadcast current state immediately after connecting
+        setTimeout(() => {
+            if (isInRoom()) {
+                broadcastState(getRawGameState());
+            }
+        }, 500);
+    });
+    
+    joinRoomBtn.addEventListener('click', () => {
+        const code = joinRoomInput.value.trim().toUpperCase();
+        if (code.length !== 6) {
+            showJoinError('Please enter a 6-character code');
+            return;
+        }
+        connectToRoom(code, handleSyncedState, handleConnectionChange);
+    });
+    
+    joinRoomInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            joinRoomBtn.click();
+        }
+    });
+    
+    // Auto-uppercase input
+    joinRoomInput.addEventListener('input', () => {
+        joinRoomInput.value = joinRoomInput.value.toUpperCase();
+    });
+    
+    disconnectBtn.addEventListener('click', () => {
+        disconnect();
+        updateShareModalUI();
+        updateSyncStatusIndicator();
+    });
 }
 
 function openNewGameModal() {
     const modal = document.getElementById('new-game-modal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+}
+
+function openShareModal() {
+    const modal = document.getElementById('share-game-modal');
+    updateShareModalUI();
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function updateShareModalUI() {
+    const connectedStatus = document.getElementById('share-connected-status');
+    const createSection = document.getElementById('share-create-section');
+    const currentCode = document.getElementById('share-current-code');
+    const joinError = document.getElementById('join-error');
+    
+    // Clear any previous errors
+    joinError.classList.add('hidden');
+    
+    if (isInRoom()) {
+        connectedStatus.classList.remove('hidden');
+        createSection.classList.add('hidden');
+        currentCode.textContent = getRoomCode();
+    } else {
+        connectedStatus.classList.add('hidden');
+        createSection.classList.remove('hidden');
+    }
+}
+
+function handleSyncedState(state) {
+    // Apply the synced state and update UI
+    applySyncedState(state, () => {
+        // Determine which screen to show based on game state
+        if (state.gameStarted) {
+            if (currentScreen !== 'game-play') {
+                setupBoard();
+                showScreen('game-play');
+            } else {
+                updateGameUI();
+            }
+            if (state.winner) {
+                showWinnerModal();
+            }
+        } else if (state.players && state.players.length > 0) {
+            if (currentScreen === 'game-play') {
+                showScreen('game-setup');
+            }
+            // Update player lists if on those screens
+            if (currentScreen === 'player-setup') {
+                renderPlayerList();
+                updateContinueButton();
+            } else if (currentScreen === 'game-setup') {
+                renderPlayerOrderList();
+            }
+        }
+    });
+}
+
+function handleConnectionChange(status) {
+    updateShareModalUI();
+    updateSyncStatusIndicator();
+    
+    if (status.error) {
+        showJoinError('Failed to connect. Please try again.');
+    }
+}
+
+function showJoinError(message) {
+    const joinError = document.getElementById('join-error');
+    joinError.textContent = message;
+    joinError.classList.remove('hidden');
+    
+    setTimeout(() => {
+        joinError.classList.add('hidden');
+    }, 3000);
+}
+
+function updateSyncStatusIndicator() {
+    const indicator = document.getElementById('sync-status');
+    const codeDisplay = document.getElementById('sync-room-code');
+    
+    if (isInRoom()) {
+        indicator.classList.remove('hidden');
+        codeDisplay.textContent = getRoomCode();
+    } else {
+        indicator.classList.add('hidden');
+    }
 }
 
 function openSettingsModal() {

@@ -34,6 +34,9 @@ const MAX_HISTORY_GAMES = 25;
 // Game history - persisted across sessions
 let gameHistory = [];
 
+// Sync callback - called whenever state changes
+let onStateChangeCallback = null;
+
 // Game state
 let gameState = {
     players: [],              // [{ name, score, history: [{ round, throws }] }]
@@ -55,6 +58,16 @@ function saveGameState() {
     expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
     const value = encodeURIComponent(JSON.stringify(gameState));
     document.cookie = `${COUNTER_COOKIE_NAME}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+    
+    // Notify sync layer of state change
+    notifyStateChange();
+}
+
+// Notify sync callback of state changes
+function notifyStateChange() {
+    if (onStateChangeCallback) {
+        onStateChangeCallback({ ...gameState });
+    }
 }
 
 // Load game state from cookie
@@ -644,4 +657,50 @@ export function getCurrentThrowCount() {
 // Get throws for current turn
 export function getCurrentThrows() {
     return [...gameState.currentTurn.throws];
+}
+
+// ==========================================
+// Sync Integration
+// ==========================================
+
+// Register callback for state changes (used by sync module)
+export function onStateChange(callback) {
+    onStateChangeCallback = callback;
+}
+
+// Get raw game state for syncing
+export function getRawGameState() {
+    return { ...gameState };
+}
+
+// Apply synced state from another device
+// Returns true if UI should be updated
+export function applySyncedState(syncedState, updateUICallback) {
+    if (!syncedState) return false;
+    
+    // Merge synced state into local state
+    gameState = {
+        ...gameState,
+        players: syncedState.players || gameState.players,
+        currentPlayerIndex: syncedState.currentPlayerIndex ?? gameState.currentPlayerIndex,
+        startingScore: syncedState.startingScore ?? gameState.startingScore,
+        doubleOut: syncedState.doubleOut ?? gameState.doubleOut,
+        currentTurn: syncedState.currentTurn || gameState.currentTurn,
+        gameStarted: syncedState.gameStarted ?? gameState.gameStarted,
+        winner: syncedState.winner,
+        mentalMathMode: syncedState.mentalMathMode ?? gameState.mentalMathMode
+    };
+    
+    // Save locally (but don't trigger sync callback to avoid loops)
+    const expires = new Date();
+    expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const value = encodeURIComponent(JSON.stringify(gameState));
+    document.cookie = `${COUNTER_COOKIE_NAME}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+    
+    // Call UI update callback if provided
+    if (updateUICallback) {
+        updateUICallback();
+    }
+    
+    return true;
 }
