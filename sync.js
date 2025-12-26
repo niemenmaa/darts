@@ -8,7 +8,7 @@ import PartySocket from "partysocket";
 // PartyKit host - uses local dev server or production
 const PARTYKIT_HOST = import.meta.env.DEV 
   ? "localhost:1999" 
-  : "darts-counter.niemenmaa.partykit.dev"; // Update this after first deploy
+  : "darts-counter.niemenmaa.partykit.dev"; 
 
 let socket = null;
 let currentRoomCode = null;

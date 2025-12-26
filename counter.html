@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Darts Counter</title>
+    <!-- Privacy-friendly analytics by Plausible -->
+  <script async src="https://plausible.io/js/pa-La3bO2LVUT5AuKerA2hCq.js"></script>
+  <script>
+    window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+    plausible.init()
+  </script>
+
   <link rel="stylesheet" href="./style.css">
 </head>
 <body class="w-screen overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -13,8 +20,8 @@
       <button id="menu-btn" class="absolute left-0 top-1/2 -translate-y-1/2 p-2 text-xl text-slate-400 hover:text-white transition-colors">
         ☰
       </button>
-      <h1 class="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-300 bg-clip-text text-transparent">
-        Counter
+      <h1 class="text-2xl font-bold">
+        Darts Point Counter 
       </h1>
     </header>
 
@@ -46,14 +53,14 @@
       <!-- Screen 1: Player Setup -->
       <div id="player-setup-screen" class="flex flex-col h-full">
         <div class="text-center mb-5">
-          <h2 class="text-lg font-medium text-slate-300">Add Players</h2>
+          <h2 class="text-lg font-medium text-slate-300 mb-4">Add Players</h2>
         </div>
         
         <!-- Add Player Form -->
         <div class="flex gap-3 mb-6">
           <input type="text" id="player-name-input" placeholder="Enter player name..." 
-            class="min-w-0 flex-1 px-4 py-3 text-base bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
-          <button id="add-player-btn" class="flex-shrink-0 px-6 py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 text-base font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
+            class="flex-1 px-4 py-3 text-base bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
+          <button id="add-player-btn" class="px-6 w-12 py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 text-base font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
             Add
           </button>
         </div>
@@ -162,15 +169,15 @@
         <!-- Compact Action Buttons -->
         <div class="flex justify-center gap-3 mt-3 max-w-xs mx-auto w-full">
           <button id="blank-btn" title="Miss"
-            class="w-14 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-2xl rounded-xl transition-all border border-slate-600">
+            class="p-2 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-2xl rounded-xl transition-all border border-slate-600">
             0️⃣
           </button>
           <button id="undo-btn" disabled title="Undo"
-            class="w-14 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-2xl rounded-xl transition-all border border-slate-600">
+            class="p-2 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-2xl rounded-xl transition-all border border-slate-600">
             ↩️
           </button>
           <button id="player-list-btn" title="Scores"
-            class="w-14 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-2xl rounded-xl transition-all border border-slate-600">
+            class="p-2 h-14 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-2xl rounded-xl transition-all border border-slate-600">
             📊
           </button>
         </div>
@@ -187,13 +194,13 @@
         <div class="flex justify-between items-center mb-3">
           <h2 class="text-lg font-bold text-white">Scores</h2>
           <div class="flex items-center gap-2">
-            <button id="all-scores-btn" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white text-xs font-medium rounded-lg transition-all">
+            <button id="all-scores-btn" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white text-sm font-medium rounded-lg transition-all">
               All Games
             </button>
             <button id="close-player-list-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
           </div>
         </div>
-        <div id="modal-player-scores" class="space-y-2 overflow-y-auto flex-1 pr-1">
+        <div id="modal-player-scores" class="space-y-2 overflow-y-auto flex-1 p-2">
           <!-- Player scores will be inserted here -->
         </div>
         <button id="new-game-btn" class="w-full mt-4 py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
@@ -351,7 +358,7 @@
     </div>
 
     <footer class="text-center mt-3 text-slate-600 text-xs">
-      <p>by aanau</p>
+      <p>by <a href="https://nmnm.fi/en" target="_blank" class="text-slate-400 hover:text-white">niemenmaa</a></p>
     </footer>
   </div>
 

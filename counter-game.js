@@ -638,15 +638,60 @@ function advanceToNextPlayer() {
     };
 }
 
-// Undo last throw (only within current turn)
+// Check if undo is possible (current turn has throws OR any player has history)
+export function canUndo() {
+    if (gameState.currentTurn.throws.length > 0) {
+        return true;
+    }
+    // Check if any player has history we can undo to
+    return gameState.players.some(player => player.history && player.history.length > 0);
+}
+
+// Undo last throw (works across turns)
 export function undoThrow() {
-    if (gameState.currentTurn.throws.length === 0) {
+    // If current turn has throws, just pop the last one
+    if (gameState.currentTurn.throws.length > 0) {
+        const removed = gameState.currentTurn.throws.pop();
+        saveGameState();
+        return { success: true, removed };
+    }
+    
+    // Otherwise, go back to the previous player's last throw
+    // Find the previous player (the one who just finished their turn)
+    const previousPlayerIndex = (gameState.currentPlayerIndex - 1 + gameState.players.length) % gameState.players.length;
+    const previousPlayer = gameState.players[previousPlayerIndex];
+    
+    // Check if previous player has history
+    if (!previousPlayer.history || previousPlayer.history.length === 0) {
         return { success: false, message: 'No throws to undo' };
     }
     
-    const removed = gameState.currentTurn.throws.pop();
+    // Pop the last round from previous player's history
+    const lastRound = previousPlayer.history.pop();
+    
+    // Restore their score to what it was before that round
+    // If they have more history, use the scoreAfter from the previous round
+    // Otherwise use the starting score
+    if (previousPlayer.history.length > 0) {
+        previousPlayer.score = previousPlayer.history[previousPlayer.history.length - 1].scoreAfter;
+    } else {
+        previousPlayer.score = gameState.startingScore;
+    }
+    
+    // Switch back to the previous player
+    gameState.currentPlayerIndex = previousPlayerIndex;
+    
+    // Restore their turn with all throws except the last one
+    const throwsToRestore = lastRound.throws.slice(0, -1);
+    const removed = lastRound.throws[lastRound.throws.length - 1];
+    
+    gameState.currentTurn = {
+        throws: throwsToRestore,
+        scoreAtStart: previousPlayer.score
+    };
+    
     saveGameState();
-    return { success: true, removed };
+    return { success: true, removed, playerChanged: true };
 }
 
 // Get throw count for current turn

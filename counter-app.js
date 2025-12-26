@@ -28,6 +28,7 @@ import {
     fullReset,
     addThrow,
     undoThrow,
+    canUndo,
     buildBoard,
     getDistanceFromCenter,
     INTERACTIVE_ZONE_MIN,
@@ -652,9 +653,9 @@ function updateGameUI() {
         turnThrows.textContent = '';
     }
     
-    // Update undo button state
+    // Update undo button state - enable if there's anything to undo (including previous turns)
     const undoBtn = document.getElementById('undo-btn');
-    undoBtn.disabled = throws.length === 0;
+    undoBtn.disabled = !canUndo();
     
     // Update all players scoreboard
     updateAllPlayersScoreboard();
@@ -1052,14 +1053,14 @@ function renderPlayerScoresModal() {
         let roundsHtml = '';
         if (isExpanded && player.history && player.history.length > 0) {
             roundsHtml = `
-                <div class="mt-2 pt-2 border-t border-slate-600/50">
+                <div class="mt-2 pt-2 border-t p-4 border-slate-600/50">
                     <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-2">
-                        <div class="text-slate-400">AVG/turn: <span class="text-white font-medium">${stats.avgPerTurn.toFixed(1)}</span></div>
-                        <div class="text-slate-400">AVG/dart: <span class="text-white font-medium">${stats.avgPerDart.toFixed(1)}</span></div>
-                        <div class="text-slate-400">100+: <span class="text-white font-medium">${stats.hundredPlusCount}</span></div>
-                        <div class="text-slate-400">First 9: <span class="text-white font-medium">${stats.firstNineAvg.toFixed(1)}</span></div>
+                        <div class="text-slate-200">AVG/turn: <span class="text-white font-medium">${stats.avgPerTurn.toFixed(1)}</span></div>
+                        <div class="text-slate-200">AVG/dart: <span class="text-white font-medium">${stats.avgPerDart.toFixed(1)}</span></div>
+                        <div class="text-slate-200">100+: <span class="text-white font-medium">${stats.hundredPlusCount}</span></div>
+                        <div class="text-slate-200">First 9: <span class="text-white font-medium">${stats.firstNineAvg.toFixed(1)}</span></div>
                     </div>
-                    <div class="text-xs text-slate-500 mb-1">Rounds:</div>
+                    <div class="text-xs text-slate-200 mb-1">Rounds:</div>
                     <div class="flex flex-wrap gap-1">
                         ${player.history.map((round, i) => {
                             const turnTotal = round.throws.reduce((s, t) => s + t.value, 0);
