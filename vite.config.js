@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         counter: resolve(__dirname, 'counter.html'),
+        throw: resolve(__dirname, 'throw.html'),
       },
     },
   },

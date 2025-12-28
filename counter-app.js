@@ -85,6 +85,64 @@ let lockedDirection = null;
 let hasDragged = false;
 let inInteractiveZone = false;
 
+// Track previous player index to detect turn changes
+let previousPlayerIndex = null;
+
+// Vibration setting (stored locally, not synced)
+let vibrateOnTurnEnabled = false;
+
+// Load vibration setting from localStorage
+function loadVibrationSetting() {
+    const saved = localStorage.getItem('dartsVibrateOnTurn');
+    vibrateOnTurnEnabled = saved === 'true';
+}
+
+// Save vibration setting to localStorage
+function saveVibrationSetting() {
+    localStorage.setItem('dartsVibrateOnTurn', String(vibrateOnTurnEnabled));
+}
+
+// Initialize vibration setting on load
+loadVibrationSetting();
+
+// ==========================================
+// Vibration Utilities
+// ==========================================
+
+/**
+ * Vibrate the phone if the Vibration API is supported and setting is enabled
+ * @param {number} duration - Vibration duration in milliseconds
+ */
+function vibratePhone(duration = 200) {
+    if (vibrateOnTurnEnabled && 'vibrate' in navigator) {
+        navigator.vibrate(duration);
+    }
+}
+
+/**
+ * Check if it's the local profile player's turn
+ * @returns {boolean} True if it's the local user's turn to throw
+ */
+function isMyTurn() {
+    const profile = getProfile();
+    const currentPlayer = getCurrentPlayer();
+    return profile && currentPlayer && currentPlayer.isProfilePlayer && currentPlayer.name === profile.name;
+}
+
+/**
+ * Handle turn change - vibrate if it's now the local player's turn
+ * @param {number} newPlayerIndex - The new current player index
+ */
+function handleTurnChange(newPlayerIndex) {
+    if (previousPlayerIndex !== null && previousPlayerIndex !== newPlayerIndex) {
+        // Turn has changed - check if it's now my turn
+        if (isMyTurn()) {
+            vibratePhone(300); // Slightly longer vibration for turn notification
+        }
+    }
+    previousPlayerIndex = newPlayerIndex;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Counter Mode initialized');
     init();
@@ -388,17 +446,23 @@ function setupPlayerSetupScreen() {
 function renderPlayerList() {
     const playerList = document.getElementById('player-list');
     const players = getPlayers();
+    const localProfile = getProfile();
     
-    // Filter out profile player - they're shown in the profile card
-    const guestPlayers = players.filter(p => !p.isProfilePlayer);
+    // Filter out only the LOCAL profile player - they're shown in the profile card
+    // But show other profile players (from other devices) in the lobby
+    const isLocalProfilePlayer = (player) => {
+        return player.isProfilePlayer && localProfile && player.name === localProfile.name;
+    };
     
-    if (guestPlayers.length === 0) {
-        // Check if we have any players at all (profile might be playing)
+    const lobbyPlayers = players.filter(p => !isLocalProfilePlayer(p));
+    
+    if (lobbyPlayers.length === 0) {
+        // Check if we have any players at all (local profile might be playing)
         if (players.length === 0 || !isProfilePlayerInGame()) {
             playerList.innerHTML = `
                 <div class="flex flex-col items-center justify-center text-slate-400 py-8">
                     <div class="text-4xl mb-2 opacity-40">👥</div>
-                    <p class="text-sm text-slate-500">No guests added yet</p>
+                    <p class="text-sm text-slate-500">No other players yet</p>
                 </div>
             `;
         } else {
@@ -407,26 +471,42 @@ function renderPlayerList() {
         return;
     }
     
-    playerList.innerHTML = guestPlayers.map((player) => {
+    playerList.innerHTML = lobbyPlayers.map((player) => {
         // Find the actual index in the full players array
         const actualIndex = players.findIndex(p => p === player);
-        const displayIndex = guestPlayers.indexOf(player) + 1;
+        const displayIndex = lobbyPlayers.indexOf(player) + 1;
+        const isRemoteProfile = player.isProfilePlayer;
+        
+        // Visual styling for profile players vs guests
+        const cardClass = isRemoteProfile 
+            ? 'bg-emerald-500/10 border-emerald-500/30' 
+            : 'bg-slate-800/60 border-slate-700/50';
+        const badgeClass = isRemoteProfile
+            ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white'
+            : 'bg-slate-600 text-white';
+        const labelText = isRemoteProfile ? 'Player' : 'Guest';
+        const labelClass = isRemoteProfile ? 'text-emerald-400' : 'text-slate-500';
+        
+        // Only allow editing/removing guests, not remote profile players
+        const actionsHtml = isRemoteProfile ? '' : `
+            <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                <button class="edit-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Edit">
+                    ✏️
+                </button>
+                <button class="delete-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Remove">
+                    ×
+                </button>
+            </div>
+        `;
         
         return `
-            <div class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 group hover:border-slate-600 transition-all">
-                <span class="w-8 h-8 flex items-center justify-center bg-slate-600 text-white font-bold rounded-lg text-sm shadow-md">
+            <div class="flex items-center gap-2 p-3 ${cardClass} rounded-xl border group hover:border-slate-600 transition-all">
+                <span class="w-8 h-8 flex items-center justify-center ${badgeClass} font-bold rounded-lg text-sm shadow-md">
                     ${displayIndex}
                 </span>
                 <span class="flex-1 text-white font-medium truncate">${escapeHtml(player.name)}</span>
-                <span class="text-xs text-slate-500 mr-2">Guest</span>
-                <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button class="edit-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Edit">
-                        ✏️
-                    </button>
-                    <button class="delete-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Remove">
-                        ×
-                    </button>
-                </div>
+                <span class="text-xs ${labelClass} mr-2">${labelText}</span>
+                ${actionsHtml}
             </div>
         `;
     }).join('');
@@ -510,6 +590,12 @@ function setupGameSetupScreen() {
     
     startGameBtn.addEventListener('click', () => {
         if (startGame()) {
+            // Initialize turn tracking - first player starts
+            previousPlayerIndex = 0;
+            // Vibrate if the local profile player starts first
+            if (isMyTurn()) {
+                vibratePhone(300);
+            }
             setupBoard();
             showScreen('game-play');
         }
@@ -783,10 +869,16 @@ function handleThrowInput(throwData) {
         
         if (result.bust) {
             showGameMessage(result.message, 'text-red-400');
+            // Turn changed after bust - check if it's now my turn
+            const state = getRawGameState();
+            handleTurnChange(state.currentPlayerIndex);
         } else if (result.win) {
             showWinnerModal();
         } else if (result.turnComplete) {
             showGameMessage('Next player', 'text-slate-400');
+            // Turn changed after 3 throws - check if it's now my turn
+            const state = getRawGameState();
+            handleTurnChange(state.currentPlayerIndex);
         }
     }
 }
@@ -967,6 +1059,7 @@ function setupModals() {
     const closeSettingsModal = document.getElementById('close-settings-modal');
     const closeSettingsBtn = document.getElementById('close-settings-btn');
     const settingsMentalMathToggle = document.getElementById('settings-mental-math-toggle');
+    const settingsVibrateToggle = document.getElementById('settings-vibrate-toggle');
     
     closeSettingsModal.addEventListener('click', () => {
         settingsModal.classList.add('hidden');
@@ -991,6 +1084,13 @@ function setupModals() {
         setMentalMathMode(!currentState);
         updateSettingsMentalMathToggle();
         updateGameUI(); // Update display immediately
+    });
+    
+    // Vibrate on turn toggle in settings modal
+    settingsVibrateToggle.addEventListener('click', () => {
+        vibrateOnTurnEnabled = !vibrateOnTurnEnabled;
+        saveVibrationSetting();
+        updateSettingsVibrateToggle();
     });
     
     // Host Game Modal
@@ -1285,6 +1385,9 @@ function handleSyncedState(state) {
             if (state.winner) {
                 showWinnerModal();
             }
+            
+            // Check for turn changes and vibrate if it's now my turn
+            handleTurnChange(state.currentPlayerIndex);
         } else {
             // In lobby/setup phase - show player setup
             // Update player lists based on current screen
@@ -1298,6 +1401,8 @@ function handleSyncedState(state) {
                 // Game was reset, go back to setup
                 showScreen('player-setup');
             }
+            // Reset turn tracking when not in game
+            previousPlayerIndex = null;
         }
     });
 }
@@ -1364,8 +1469,9 @@ function openSettingsModal() {
     doubleOutEl.textContent = getDoubleOut() ? 'Yes' : 'No';
     doubleOutEl.className = `text-sm font-medium ${getDoubleOut() ? 'text-emerald-400' : 'text-slate-400'}`;
     
-    // Update mental math toggle state
+    // Update toggle states
     updateSettingsMentalMathToggle();
+    updateSettingsVibrateToggle();
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -1380,6 +1486,24 @@ function updateSettingsMentalMathToggle() {
     toggle.dataset.enabled = String(enabled);
     
     if (enabled) {
+        toggle.classList.remove('bg-slate-600');
+        toggle.classList.add('bg-emerald-500');
+        knob.classList.add('translate-x-5');
+    } else {
+        toggle.classList.add('bg-slate-600');
+        toggle.classList.remove('bg-emerald-500');
+        knob.classList.remove('translate-x-5');
+    }
+}
+
+function updateSettingsVibrateToggle() {
+    const toggle = document.getElementById('settings-vibrate-toggle');
+    if (!toggle) return;
+    const knob = toggle.querySelector('span');
+    
+    toggle.dataset.enabled = String(vibrateOnTurnEnabled);
+    
+    if (vibrateOnTurnEnabled) {
         toggle.classList.remove('bg-slate-600');
         toggle.classList.add('bg-emerald-500');
         knob.classList.add('translate-x-5');

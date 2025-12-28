@@ -415,10 +415,7 @@ function gaussianRandom(mean, stdDev) {
  * @returns {Object} { r, angle } - Coordinates with variance applied
  */
 export function applyGaussianVariance(r, angle, rStdDev, angleStdDev) {
-    // Convert stddev fractions to actual values
-    // rStdDev is fraction of 100% board radius
     const rStdDevActual = rStdDev * 100;
-    // angleStdDev is fraction of 360°
     const angleStdDevActual = angleStdDev * 360;
     
     // Apply Gaussian variance
