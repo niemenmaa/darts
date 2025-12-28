@@ -58,20 +58,20 @@ function setupSettingsModal() {
   const settingsMin = document.getElementById('settings-min');
   const settingsMax = document.getElementById('settings-max');
   const settingsMentalMath = document.getElementById('settings-mental-math');
-  const settingsRingAccuracy = document.getElementById('settings-ring-accuracy');
-  const settingsSectorAccuracy = document.getElementById('settings-sector-accuracy');
-  const ringAccuracyValue = document.getElementById('ring-accuracy-value');
-  const sectorAccuracyValue = document.getElementById('sector-accuracy-value');
+  const settingsRStdDev = document.getElementById('settings-r-stddev');
+  const settingsAngleStdDev = document.getElementById('settings-angle-stddev');
+  const rStdDevValue = document.getElementById('r-stddev-value');
+  const angleStdDevValue = document.getElementById('angle-stddev-value');
   
   // Initialize form with current settings
   function loadFormValues() {
     settingsMin.value = settings.min;
     settingsMax.value = settings.max;
     updateMentalMathToggle(settings.mentalMathMode);
-    settingsRingAccuracy.value = settings.ringAccuracy;
-    settingsSectorAccuracy.value = settings.sectorAccuracy;
-    ringAccuracyValue.textContent = `${settings.ringAccuracy}%`;
-    sectorAccuracyValue.textContent = `${settings.sectorAccuracy}%`;
+    settingsRStdDev.value = settings.rStdDev;
+    settingsAngleStdDev.value = settings.angleStdDev;
+    rStdDevValue.textContent = settings.rStdDev.toFixed(2);
+    angleStdDevValue.textContent = settings.angleStdDev.toFixed(2);
   }
   
   // Update toggle visual state
@@ -90,13 +90,13 @@ function setupSettingsModal() {
     toggle.dataset.enabled = enabled;
   }
   
-  // Update accuracy value displays in real-time
-  settingsRingAccuracy.addEventListener('input', () => {
-    ringAccuracyValue.textContent = `${settingsRingAccuracy.value}%`;
+  // Update stddev value displays in real-time
+  settingsRStdDev.addEventListener('input', () => {
+    rStdDevValue.textContent = parseFloat(settingsRStdDev.value).toFixed(2);
   });
   
-  settingsSectorAccuracy.addEventListener('input', () => {
-    sectorAccuracyValue.textContent = `${settingsSectorAccuracy.value}%`;
+  settingsAngleStdDev.addEventListener('input', () => {
+    angleStdDevValue.textContent = parseFloat(settingsAngleStdDev.value).toFixed(2);
   });
   
   // Open modal
@@ -130,15 +130,15 @@ function setupSettingsModal() {
     const newMin = parseInt(settingsMin.value) || 2;
     const newMax = parseInt(settingsMax.value) || 170;
     const mentalMathEnabled = settingsMentalMath.dataset.enabled === 'true';
-    const ringAccuracy = parseInt(settingsRingAccuracy.value) || 100;
-    const sectorAccuracy = parseInt(settingsSectorAccuracy.value) || 100;
+    const rStdDev = parseFloat(settingsRStdDev.value) || 0;
+    const angleStdDev = parseFloat(settingsAngleStdDev.value) || 0;
     
     updateSettings({
       min: newMin,
       max: newMax,
       mentalMathMode: mentalMathEnabled,
-      ringAccuracy: ringAccuracy,
-      sectorAccuracy: sectorAccuracy
+      rStdDev: rStdDev,
+      angleStdDev: angleStdDev
     });
     
     closeModal();

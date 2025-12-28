@@ -32,11 +32,16 @@
         <span>Endings Practice</span>
       </a>
       <div class="border-t border-slate-700"></div>
-      <button id="menu-share-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+      <button id="menu-host-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
         <span class="text-lg">📡</span>
-        <span>Share Game</span>
+        <span>Host Game</span>
+      </button>
+      <button id="menu-join-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+        <span class="text-lg">🔗</span>
+        <span>Join Game</span>
       </button>
       <div id="menu-game-options" class="hidden">
+        <div class="border-t border-slate-700"></div>
         <button id="menu-settings-btn" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
           <span class="text-lg">⚙️</span>
           <span>Settings</span>
@@ -52,22 +57,62 @@
       
       <!-- Screen 1: Player Setup -->
       <div id="player-setup-screen" class="flex flex-col h-full">
-        <div class="text-center mb-5">
-          <h2 class="text-lg font-medium text-slate-300 mb-4">Add Players</h2>
+        
+        <!-- Profile Section -->
+        <div id="profile-section" class="mb-5">
+          <!-- No Profile: Create Profile Button -->
+          <div id="no-profile-card" class="hidden">
+            <button id="create-profile-btn" class="w-full py-4 bg-slate-800/80 hover:bg-slate-700/80 border border-dashed border-slate-600 hover:border-amber-500/50 rounded-xl transition-all group">
+              <div class="flex items-center justify-center gap-2">
+                <span class="text-2xl group-hover:scale-110 transition-transform">👤</span>
+                <span class="text-slate-300 group-hover:text-white font-medium">Create Your Profile</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Track your stats across games</p>
+            </button>
+          </div>
+          
+          <!-- Has Profile: Profile Card with Toggle -->
+          <div id="profile-card" class="hidden p-4 bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-600 text-slate-900 font-bold rounded-full text-lg shadow-md">
+                  👤
+                </div>
+                <div>
+                  <div id="profile-name-display" class="text-white font-semibold"></div>
+                  <div id="profile-stats-display" class="text-xs text-amber-300/70"></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <button id="edit-profile-btn" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all" title="Edit Profile">
+                  ⚙️
+                </button>
+                <button id="profile-playing-toggle" type="button" data-enabled="true"
+                  class="relative w-12 h-7 rounded-full bg-emerald-500 transition-colors focus:outline-none flex-shrink-0">
+                  <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform translate-x-5 shadow-lg"></span>
+                </button>
+              </div>
+            </div>
+            <div id="profile-playing-label" class="text-xs text-emerald-400 mt-2 text-right">Playing</div>
+          </div>
         </div>
         
-        <!-- Add Player Form -->
-        <div class="flex gap-3 mb-6">
-          <input type="text" id="player-name-input" placeholder="Enter player name..." 
+        <div class="text-center mb-3">
+          <h2 class="text-sm font-medium text-slate-400">Add Guests</h2>
+        </div>
+        
+        <!-- Add Guest Form -->
+        <div class="flex gap-3 mb-4">
+          <input type="text" id="player-name-input" placeholder="Enter guest name..." 
             class="flex-1 px-4 py-3 text-base bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
           <button id="add-player-btn" class="px-6 w-12 py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 text-base font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
             Add
           </button>
         </div>
         
-        <!-- Player List -->
+        <!-- Guest List -->
         <div id="player-list" class="flex-1 overflow-y-auto space-y-2 mb-5 pr-1">
-          <!-- Player cards will be inserted here -->
+          <!-- Guest player cards will be inserted here -->
         </div>
         
         <!-- Continue Button -->
@@ -299,61 +344,174 @@
       </div>
     </div>
 
-    <!-- Share Game Modal -->
-    <div id="share-game-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <!-- Host Game Modal -->
+    <div id="host-game-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
       <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-white">Share Game</h2>
-          <button id="close-share-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+          <h2 class="text-lg font-bold text-white">Host Game</h2>
+          <button id="close-host-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
         </div>
         
-        <!-- Current Connection Status -->
-        <div id="share-connected-status" class="hidden mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-sm font-medium text-emerald-300">Connected</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-2xl font-mono font-bold text-white tracking-wider" id="share-current-code">ABC123</span>
-            <button id="disconnect-btn" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-medium rounded-lg transition-all border border-red-500/30">
-              Disconnect
-            </button>
-          </div>
-        </div>
-        
-        <!-- Create New Room -->
-        <div id="share-create-section" class="mb-5">
-          <p class="text-sm text-slate-400 mb-3">Start sharing this game with other devices</p>
+        <!-- Not Connected -->
+        <div id="host-not-connected" class="mb-4">
+          <p class="text-sm text-slate-400 mb-4">Create a room and share the code with others to play together.</p>
           <button id="create-room-btn" class="w-full py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
             📡 Create Room
           </button>
         </div>
         
-        <div class="relative my-4">
-          <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-slate-700"></div>
+        <!-- Connected Status -->
+        <div id="host-connected-status" class="hidden">
+          <div class="mb-4 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-sm font-medium text-emerald-300">Room Active</span>
+            </div>
+            <div class="text-center">
+              <p class="text-xs text-slate-400 mb-1">Share this code:</p>
+              <span class="text-3xl font-mono font-bold text-white tracking-widest" id="host-room-code">ABC123</span>
+            </div>
           </div>
-          <div class="relative flex justify-center">
-            <span class="px-3 bg-slate-800 text-xs text-slate-500 uppercase tracking-wider">Or join existing</span>
-          </div>
+          <p class="text-sm text-slate-400 mb-3 text-center">Players can join using this code</p>
+          <button id="host-disconnect-btn" class="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-sm font-medium rounded-xl transition-all border border-red-500/20">
+            Close Room
+          </button>
         </div>
         
-        <!-- Join Room -->
-        <div id="share-join-section">
-          <p class="text-sm text-slate-400 mb-3">Enter a room code to join another device's game</p>
-          <div class="flex gap-2">
+        <button id="close-host-btn" class="w-full mt-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all border border-slate-600">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Join Game Modal -->
+    <div id="join-game-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-white">Join Game</h2>
+          <button id="close-join-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+        </div>
+        
+        <!-- Not Connected -->
+        <div id="join-not-connected">
+          <p class="text-sm text-slate-400 mb-4">Enter a room code to join someone else's game.</p>
+          <div class="flex gap-2 mb-3">
             <input type="text" id="join-room-input" placeholder="Enter code..." maxlength="6"
               class="flex-1 px-4 py-3 text-center text-lg font-mono font-bold uppercase tracking-widest bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
             <button id="join-room-btn" class="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20">
               Join
             </button>
           </div>
-          <p id="join-error" class="hidden mt-2 text-sm text-red-400"></p>
+          <p id="join-error" class="hidden text-sm text-red-400"></p>
         </div>
         
-        <button id="close-share-btn" class="w-full mt-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all border border-slate-600">
+        <!-- Connected Status -->
+        <div id="join-connected-status" class="hidden">
+          <div class="mb-4 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-sm font-medium text-emerald-300">Connected</span>
+            </div>
+            <div class="text-center">
+              <p class="text-xs text-slate-400 mb-1">Room code:</p>
+              <span class="text-2xl font-mono font-bold text-white tracking-widest" id="join-room-code">ABC123</span>
+            </div>
+          </div>
+          <p class="text-sm text-slate-400 mb-3 text-center">You've joined the game lobby</p>
+          <button id="join-disconnect-btn" class="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-sm font-medium rounded-xl transition-all border border-red-500/20">
+            Leave Room
+          </button>
+        </div>
+        
+        <button id="close-join-btn" class="w-full mt-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all border border-slate-600">
           Close
         </button>
+      </div>
+    </div>
+
+    <!-- Create Profile Modal -->
+    <div id="create-profile-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-white">Create Your Profile</h2>
+          <button id="close-create-profile-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+        </div>
+        
+        <p class="text-sm text-slate-400 mb-4">Your profile tracks your game statistics across all sessions.</p>
+        
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Your Name</label>
+          <input type="text" id="create-profile-name-input" placeholder="Enter your name..." 
+            class="w-full px-4 py-3 text-base bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
+        </div>
+        
+        <button id="confirm-create-profile-btn" class="w-full py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20">
+          Create Profile
+        </button>
+      </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="edit-profile-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-slate-800 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-white">Your Profile</h2>
+          <button id="close-edit-profile-modal" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all text-xl">&times;</button>
+        </div>
+        
+        <!-- Profile Name -->
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Name</label>
+          <div class="flex gap-2">
+            <input type="text" id="edit-profile-name-input" 
+              class="flex-1 px-4 py-3 text-base bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all">
+            <button id="save-profile-name-btn" class="px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold rounded-xl transition-all">
+              Save
+            </button>
+          </div>
+        </div>
+        
+        <!-- Lifetime Stats -->
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Lifetime Statistics</label>
+          <div class="bg-slate-700/50 rounded-xl p-3 space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Games Played</span>
+              <span id="profile-stat-games" class="text-white font-medium">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Games Won</span>
+              <span id="profile-stat-wins" class="text-white font-medium">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Win Rate</span>
+              <span id="profile-stat-winrate" class="text-white font-medium">0%</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Total Darts</span>
+              <span id="profile-stat-darts" class="text-white font-medium">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Avg per Dart</span>
+              <span id="profile-stat-avg" class="text-white font-medium">0.0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">100+ Turns</span>
+              <span id="profile-stat-100plus" class="text-white font-medium">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">Best Avg/Turn</span>
+              <span id="profile-stat-best" class="text-white font-medium">0.0</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Delete Profile -->
+        <div class="pt-3 border-t border-slate-700">
+          <button id="delete-profile-btn" class="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-sm font-medium rounded-xl transition-all border border-red-500/20">
+            Delete Profile
+          </button>
+        </div>
       </div>
     </div>
 

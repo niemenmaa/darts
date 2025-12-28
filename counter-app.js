@@ -47,7 +47,17 @@ import {
     getFirstNineAverage,
     onStateChange,
     getRawGameState,
-    applySyncedState
+    applySyncedState,
+    // Profile functions
+    getProfile,
+    hasProfile,
+    createProfile,
+    updateProfileName,
+    deleteProfile,
+    addProfilePlayer,
+    removeProfilePlayer,
+    isProfilePlayerInGame,
+    recalculateProfileStats
 } from './counter-game.js';
 import {
     generateRoomCode,
@@ -87,6 +97,7 @@ function init() {
     gamePlayScreen = document.getElementById('game-play-screen');
     
     setupMenu();
+    setupProfileSection();
     setupPlayerSetupScreen();
     setupGameSetupScreen();
     setupGamePlayScreen();
@@ -131,7 +142,8 @@ function setupSync() {
 function setupMenu() {
     const menuBtn = document.getElementById('menu-btn');
     const menuDropdown = document.getElementById('menu-dropdown');
-    const menuShareBtn = document.getElementById('menu-share-btn');
+    const menuHostBtn = document.getElementById('menu-host-btn');
+    const menuJoinBtn = document.getElementById('menu-join-btn');
     const menuSettingsBtn = document.getElementById('menu-settings-btn');
     const menuNewGameBtn = document.getElementById('menu-new-game-btn');
     
@@ -148,10 +160,16 @@ function setupMenu() {
         }
     });
     
-    // Menu Share button
-    menuShareBtn.addEventListener('click', () => {
+    // Menu Host button
+    menuHostBtn.addEventListener('click', () => {
         menuDropdown.classList.add('hidden');
-        openShareModal();
+        openHostModal();
+    });
+    
+    // Menu Join button
+    menuJoinBtn.addEventListener('click', () => {
+        menuDropdown.classList.add('hidden');
+        openJoinModal();
     });
     
     // Menu Settings button
@@ -168,6 +186,124 @@ function setupMenu() {
 }
 
 // ==========================================
+// Profile Section
+// ==========================================
+
+// Track if profile player is participating in next game
+let profilePlaying = true;
+
+function setupProfileSection() {
+    const createProfileBtn = document.getElementById('create-profile-btn');
+    const editProfileBtn = document.getElementById('edit-profile-btn');
+    const profilePlayingToggle = document.getElementById('profile-playing-toggle');
+    
+    // Create profile button
+    createProfileBtn.addEventListener('click', () => {
+        openCreateProfileModal();
+    });
+    
+    // Edit profile button
+    editProfileBtn.addEventListener('click', () => {
+        openEditProfileModal();
+    });
+    
+    // Profile playing toggle
+    profilePlayingToggle.addEventListener('click', () => {
+        profilePlaying = !profilePlaying;
+        updateProfilePlayingToggle();
+        updateProfilePlayerInGame();
+        updateContinueButton();
+        
+        // Broadcast state change if in a room
+        if (isInRoom()) {
+            broadcastState(getRawGameState());
+        }
+    });
+    
+    // Initialize profile UI
+    updateProfileSection();
+}
+
+function updateProfileSection() {
+    const noProfileCard = document.getElementById('no-profile-card');
+    const profileCard = document.getElementById('profile-card');
+    
+    if (hasProfile()) {
+        noProfileCard.classList.add('hidden');
+        profileCard.classList.remove('hidden');
+        
+        const profile = getProfile();
+        document.getElementById('profile-name-display').textContent = profile.name;
+        
+        // Display quick stats
+        const stats = profile.stats;
+        const winRate = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(0) : 0;
+        const avgPerDart = stats.totalDarts > 0 ? (stats.totalPoints / stats.totalDarts).toFixed(1) : 0;
+        document.getElementById('profile-stats-display').textContent = 
+            `${stats.gamesWon} wins • ${avgPerDart} avg`;
+        
+        // Sync profilePlaying state with actual game state (for when receiving synced state)
+        // Only sync if in a room, otherwise keep user's toggle preference
+        if (isInRoom()) {
+            profilePlaying = isProfilePlayerInGame();
+        }
+        
+        updateProfilePlayingToggle();
+        
+        // Ensure profile player is in game if toggle is on (only update if not receiving sync)
+        if (!isInRoom()) {
+            updateProfilePlayerInGame();
+        }
+    } else {
+        noProfileCard.classList.remove('hidden');
+        profileCard.classList.add('hidden');
+    }
+}
+
+function updateProfilePlayingToggle() {
+    const toggle = document.getElementById('profile-playing-toggle');
+    const label = document.getElementById('profile-playing-label');
+    const knob = toggle.querySelector('span');
+    
+    toggle.dataset.enabled = String(profilePlaying);
+    
+    if (profilePlaying) {
+        toggle.classList.remove('bg-slate-600');
+        toggle.classList.add('bg-emerald-500');
+        knob.classList.add('translate-x-5');
+        label.textContent = 'Playing';
+        label.classList.remove('text-slate-500');
+        label.classList.add('text-emerald-400');
+    } else {
+        toggle.classList.add('bg-slate-600');
+        toggle.classList.remove('bg-emerald-500');
+        knob.classList.remove('translate-x-5');
+        label.textContent = 'Not playing';
+        label.classList.add('text-slate-500');
+        label.classList.remove('text-emerald-400');
+    }
+}
+
+function updateProfilePlayerInGame() {
+    if (!hasProfile()) return;
+    
+    if (profilePlaying) {
+        // Add profile player if not already in game
+        if (!isProfilePlayerInGame()) {
+            addProfilePlayer();
+        }
+    } else {
+        // Remove profile player if in game
+        if (isProfilePlayerInGame()) {
+            removeProfilePlayer();
+        }
+    }
+    
+    // Re-render the player list to reflect changes
+    renderPlayerList();
+}
+
+// ==========================================
 // Screen Navigation
 // ==========================================
 
@@ -180,7 +316,9 @@ function showScreen(screenName) {
     
     if (screenName === 'player-setup') {
         playerSetupScreen.classList.remove('hidden');
+        updateProfileSection();
         renderPlayerList();
+        updateContinueButton();
     } else if (screenName === 'game-setup') {
         gameSetupScreen.classList.remove('hidden');
         updateModeButtons();
@@ -217,6 +355,10 @@ function setupPlayerSetupScreen() {
             playerNameInput.focus();
             renderPlayerList();
             updateContinueButton();
+            // Broadcast if in room
+            if (isInRoom()) {
+                broadcastState(getRawGameState());
+            }
         }
     });
     
@@ -227,6 +369,10 @@ function setupPlayerSetupScreen() {
                 playerNameInput.value = '';
                 renderPlayerList();
                 updateContinueButton();
+                // Broadcast if in room
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
             }
         }
     });
@@ -243,67 +389,60 @@ function renderPlayerList() {
     const playerList = document.getElementById('player-list');
     const players = getPlayers();
     
-    if (players.length === 0) {
-        playerList.innerHTML = `
-            <div class="flex flex-col items-center justify-center text-slate-400 py-16">
-                <div class="text-6xl mb-4 opacity-40">👥</div>
-                <p class="text-lg font-medium">No players yet</p>
-                <p class="text-sm text-slate-500 mt-1">Add at least one player to continue</p>
-            </div>
-        `;
+    // Filter out profile player - they're shown in the profile card
+    const guestPlayers = players.filter(p => !p.isProfilePlayer);
+    
+    if (guestPlayers.length === 0) {
+        // Check if we have any players at all (profile might be playing)
+        if (players.length === 0 || !isProfilePlayerInGame()) {
+            playerList.innerHTML = `
+                <div class="flex flex-col items-center justify-center text-slate-400 py-8">
+                    <div class="text-4xl mb-2 opacity-40">👥</div>
+                    <p class="text-sm text-slate-500">No guests added yet</p>
+                </div>
+            `;
+        } else {
+            playerList.innerHTML = '';
+        }
         return;
     }
     
-    playerList.innerHTML = players.map((player, index) => `
-        <div class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 group hover:border-slate-600 transition-all">
-            <span class="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-600 text-slate-900 font-bold rounded-lg text-sm shadow-md">
-                ${index + 1}
-            </span>
-            <span class="flex-1 text-white font-medium truncate">${escapeHtml(player.name)}</span>
-            <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                <button class="move-up-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all ${index === 0 ? 'invisible' : ''}" data-index="${index}" title="Move up">
-                    ↑
-                </button>
-                <button class="move-down-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all ${index === players.length - 1 ? 'invisible' : ''}" data-index="${index}" title="Move down">
-                    ↓
-                </button>
-                <button class="edit-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${index}" title="Edit">
-                    ✏️
-                </button>
-                <button class="delete-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${index}" title="Remove">
-                    ×
-                </button>
+    playerList.innerHTML = guestPlayers.map((player) => {
+        // Find the actual index in the full players array
+        const actualIndex = players.findIndex(p => p === player);
+        const displayIndex = guestPlayers.indexOf(player) + 1;
+        
+        return `
+            <div class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 group hover:border-slate-600 transition-all">
+                <span class="w-8 h-8 flex items-center justify-center bg-slate-600 text-white font-bold rounded-lg text-sm shadow-md">
+                    ${displayIndex}
+                </span>
+                <span class="flex-1 text-white font-medium truncate">${escapeHtml(player.name)}</span>
+                <span class="text-xs text-slate-500 mr-2">Guest</span>
+                <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <button class="edit-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Edit">
+                        ✏️
+                    </button>
+                    <button class="delete-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Remove">
+                        ×
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join('');
-    
-    // Add event listeners
-    playerList.querySelectorAll('.move-up-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const index = parseInt(btn.dataset.index);
-            if (movePlayer(index, index - 1)) {
-                renderPlayerList();
-            }
-        });
-    });
-    
-    playerList.querySelectorAll('.move-down-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const index = parseInt(btn.dataset.index);
-            if (movePlayer(index, index + 1)) {
-                renderPlayerList();
-            }
-        });
-    });
+        `;
+    }).join('');
     
     playerList.querySelectorAll('.edit-player-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const index = parseInt(btn.dataset.index);
             const players = getPlayers();
-            const newName = prompt('Edit player name:', players[index].name);
+            const newName = prompt('Edit guest name:', players[index].name);
             if (newName !== null && newName.trim()) {
                 updatePlayer(index, newName);
                 renderPlayerList();
+                // Broadcast if in room
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
             }
         });
     });
@@ -314,6 +453,10 @@ function renderPlayerList() {
             removePlayer(index);
             renderPlayerList();
             updateContinueButton();
+            // Broadcast if in room
+            if (isInRoom()) {
+                broadcastState(getRawGameState());
+            }
         });
     });
 }
@@ -428,22 +571,30 @@ function renderPlayerOrderList() {
     const listContainer = document.getElementById('player-order-list');
     const players = getPlayers();
     
-    listContainer.innerHTML = players.map((player, index) => `
-        <div class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 group hover:border-slate-600 transition-all">
-            <span class="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-600 text-slate-900 font-bold rounded-md text-xs shadow">
-                ${index + 1}
-            </span>
-            <span class="flex-1 text-white font-medium truncate text-sm">${escapeHtml(player.name)}</span>
-            <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                <button class="order-move-up-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-all text-sm ${index === 0 ? 'invisible' : ''}" data-index="${index}">
-                    ↑
-                </button>
-                <button class="order-move-down-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-all text-sm ${index === players.length - 1 ? 'invisible' : ''}" data-index="${index}">
-                    ↓
-                </button>
+    listContainer.innerHTML = players.map((player, index) => {
+        const isProfile = player.isProfilePlayer;
+        const badgeClass = isProfile 
+            ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-slate-900' 
+            : 'bg-slate-600 text-white';
+        
+        return `
+            <div class="flex items-center gap-2 p-3 ${isProfile ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800/60 border-slate-700/50'} rounded-xl border group hover:border-slate-600 transition-all">
+                <span class="w-7 h-7 flex items-center justify-center ${badgeClass} font-bold rounded-md text-xs shadow">
+                    ${index + 1}
+                </span>
+                <span class="flex-1 text-white font-medium truncate text-sm">${escapeHtml(player.name)}</span>
+                ${isProfile ? '<span class="text-xs text-amber-400/70">You</span>' : '<span class="text-xs text-slate-500">Guest</span>'}
+                <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <button class="order-move-up-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-all text-sm ${index === 0 ? 'invisible' : ''}" data-index="${index}">
+                        ↑
+                    </button>
+                    <button class="order-move-down-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-all text-sm ${index === players.length - 1 ? 'invisible' : ''}" data-index="${index}">
+                        ↓
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
     
     // Add event listeners
     listContainer.querySelectorAll('.order-move-up-btn').forEach(btn => {
@@ -451,6 +602,10 @@ function renderPlayerOrderList() {
             const index = parseInt(btn.dataset.index);
             if (movePlayer(index, index - 1)) {
                 renderPlayerOrderList();
+                // Broadcast if in room
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
             }
         });
     });
@@ -460,6 +615,10 @@ function renderPlayerOrderList() {
             const index = parseInt(btn.dataset.index);
             if (movePlayer(index, index + 1)) {
                 renderPlayerOrderList();
+                // Broadcast if in room
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
             }
         });
     });
@@ -834,41 +993,72 @@ function setupModals() {
         updateGameUI(); // Update display immediately
     });
     
-    // Share game modal
-    const shareModal = document.getElementById('share-game-modal');
-    const closeShareModal = document.getElementById('close-share-modal');
-    const closeShareBtn = document.getElementById('close-share-btn');
+    // Host Game Modal
+    const hostModal = document.getElementById('host-game-modal');
+    const closeHostModal = document.getElementById('close-host-modal');
+    const closeHostBtn = document.getElementById('close-host-btn');
     const createRoomBtn = document.getElementById('create-room-btn');
-    const joinRoomBtn = document.getElementById('join-room-btn');
-    const joinRoomInput = document.getElementById('join-room-input');
-    const disconnectBtn = document.getElementById('disconnect-btn');
+    const hostDisconnectBtn = document.getElementById('host-disconnect-btn');
     
-    closeShareModal.addEventListener('click', () => {
-        shareModal.classList.add('hidden');
-        shareModal.classList.remove('flex');
+    closeHostModal.addEventListener('click', () => {
+        hostModal.classList.add('hidden');
+        hostModal.classList.remove('flex');
     });
     
-    closeShareBtn.addEventListener('click', () => {
-        shareModal.classList.add('hidden');
-        shareModal.classList.remove('flex');
+    closeHostBtn.addEventListener('click', () => {
+        hostModal.classList.add('hidden');
+        hostModal.classList.remove('flex');
     });
     
-    shareModal.addEventListener('click', (e) => {
-        if (e.target === shareModal) {
-            shareModal.classList.add('hidden');
-            shareModal.classList.remove('flex');
+    hostModal.addEventListener('click', (e) => {
+        if (e.target === hostModal) {
+            hostModal.classList.add('hidden');
+            hostModal.classList.remove('flex');
         }
     });
     
     createRoomBtn.addEventListener('click', () => {
+        isHosting = true;
         const roomCode = generateRoomCode();
         connectToRoom(roomCode, handleSyncedState, handleConnectionChange);
         // Broadcast current state immediately after connecting
         setTimeout(() => {
             if (isInRoom()) {
                 broadcastState(getRawGameState());
+                updateHostModalUI();
             }
         }, 500);
+    });
+    
+    hostDisconnectBtn.addEventListener('click', () => {
+        disconnect();
+        updateHostModalUI();
+        updateSyncStatusIndicator();
+    });
+    
+    // Join Game Modal
+    const joinModal = document.getElementById('join-game-modal');
+    const closeJoinModal = document.getElementById('close-join-modal');
+    const closeJoinBtn = document.getElementById('close-join-btn');
+    const joinRoomBtn = document.getElementById('join-room-btn');
+    const joinRoomInput = document.getElementById('join-room-input');
+    const joinDisconnectBtn = document.getElementById('join-disconnect-btn');
+    
+    closeJoinModal.addEventListener('click', () => {
+        joinModal.classList.add('hidden');
+        joinModal.classList.remove('flex');
+    });
+    
+    closeJoinBtn.addEventListener('click', () => {
+        joinModal.classList.add('hidden');
+        joinModal.classList.remove('flex');
+    });
+    
+    joinModal.addEventListener('click', (e) => {
+        if (e.target === joinModal) {
+            joinModal.classList.add('hidden');
+            joinModal.classList.remove('flex');
+        }
     });
     
     joinRoomBtn.addEventListener('click', () => {
@@ -877,6 +1067,8 @@ function setupModals() {
             showJoinError('Please enter a 6-character code');
             return;
         }
+        // Mark that we're joining (not hosting)
+        isHosting = false;
         connectToRoom(code, handleSyncedState, handleConnectionChange);
     });
     
@@ -891,11 +1083,135 @@ function setupModals() {
         joinRoomInput.value = joinRoomInput.value.toUpperCase();
     });
     
-    disconnectBtn.addEventListener('click', () => {
+    joinDisconnectBtn.addEventListener('click', () => {
         disconnect();
-        updateShareModalUI();
+        updateJoinModalUI();
         updateSyncStatusIndicator();
     });
+    
+    // Create Profile Modal
+    const createProfileModal = document.getElementById('create-profile-modal');
+    const closeCreateProfileModal = document.getElementById('close-create-profile-modal');
+    const createProfileNameInput = document.getElementById('create-profile-name-input');
+    const confirmCreateProfileBtn = document.getElementById('confirm-create-profile-btn');
+    
+    closeCreateProfileModal.addEventListener('click', () => {
+        createProfileModal.classList.add('hidden');
+        createProfileModal.classList.remove('flex');
+    });
+    
+    createProfileModal.addEventListener('click', (e) => {
+        if (e.target === createProfileModal) {
+            createProfileModal.classList.add('hidden');
+            createProfileModal.classList.remove('flex');
+        }
+    });
+    
+    confirmCreateProfileBtn.addEventListener('click', () => {
+        const name = createProfileNameInput.value.trim();
+        if (name) {
+            createProfile(name);
+            createProfileModal.classList.add('hidden');
+            createProfileModal.classList.remove('flex');
+            createProfileNameInput.value = '';
+            profilePlaying = true; // Default to playing when profile is created
+            updateProfileSection();
+            updateProfilePlayerInGame();
+            updateContinueButton();
+        }
+    });
+    
+    createProfileNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            confirmCreateProfileBtn.click();
+        }
+    });
+    
+    // Edit Profile Modal
+    const editProfileModal = document.getElementById('edit-profile-modal');
+    const closeEditProfileModal = document.getElementById('close-edit-profile-modal');
+    const editProfileNameInput = document.getElementById('edit-profile-name-input');
+    const saveProfileNameBtn = document.getElementById('save-profile-name-btn');
+    const deleteProfileBtn = document.getElementById('delete-profile-btn');
+    
+    closeEditProfileModal.addEventListener('click', () => {
+        editProfileModal.classList.add('hidden');
+        editProfileModal.classList.remove('flex');
+    });
+    
+    editProfileModal.addEventListener('click', (e) => {
+        if (e.target === editProfileModal) {
+            editProfileModal.classList.add('hidden');
+            editProfileModal.classList.remove('flex');
+        }
+    });
+    
+    saveProfileNameBtn.addEventListener('click', () => {
+        const newName = editProfileNameInput.value.trim();
+        if (newName) {
+            updateProfileName(newName);
+            updateProfileSection();
+            // Also update if profile player is in game
+            if (isProfilePlayerInGame()) {
+                const players = getPlayers();
+                const profileIndex = players.findIndex(p => p.isProfilePlayer);
+                if (profileIndex >= 0) {
+                    updatePlayer(profileIndex, newName);
+                }
+            }
+        }
+    });
+    
+    deleteProfileBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to delete your profile? This cannot be undone.')) {
+            // Remove profile player from game first
+            if (isProfilePlayerInGame()) {
+                removeProfilePlayer();
+            }
+            deleteProfile();
+            editProfileModal.classList.add('hidden');
+            editProfileModal.classList.remove('flex');
+            profilePlaying = true; // Reset for next profile
+            updateProfileSection();
+            renderPlayerList();
+            updateContinueButton();
+        }
+    });
+}
+
+function openCreateProfileModal() {
+    const modal = document.getElementById('create-profile-modal');
+    const input = document.getElementById('create-profile-name-input');
+    input.value = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => input.focus(), 100);
+}
+
+function openEditProfileModal() {
+    const modal = document.getElementById('edit-profile-modal');
+    const input = document.getElementById('edit-profile-name-input');
+    const profile = getProfile();
+    
+    if (profile) {
+        input.value = profile.name;
+        
+        // Update stats display
+        const stats = profile.stats;
+        const winRate = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(0) : 0;
+        const avgPerDart = stats.totalDarts > 0 ? (stats.totalPoints / stats.totalDarts).toFixed(1) : 0;
+        
+        document.getElementById('profile-stat-games').textContent = stats.gamesPlayed;
+        document.getElementById('profile-stat-wins').textContent = stats.gamesWon;
+        document.getElementById('profile-stat-winrate').textContent = `${winRate}%`;
+        document.getElementById('profile-stat-darts').textContent = stats.totalDarts;
+        document.getElementById('profile-stat-avg').textContent = avgPerDart;
+        document.getElementById('profile-stat-100plus').textContent = stats.hundredPlusCount;
+        document.getElementById('profile-stat-best').textContent = stats.bestAvgPerTurn.toFixed(1);
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
 }
 
 function openNewGameModal() {
@@ -904,29 +1220,54 @@ function openNewGameModal() {
     modal.classList.add('flex');
 }
 
-function openShareModal() {
-    const modal = document.getElementById('share-game-modal');
-    updateShareModalUI();
+// Track if we're hosting or joining
+let isHosting = true;
+
+function openHostModal() {
+    const modal = document.getElementById('host-game-modal');
+    updateHostModalUI();
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
 
-function updateShareModalUI() {
-    const connectedStatus = document.getElementById('share-connected-status');
-    const createSection = document.getElementById('share-create-section');
-    const currentCode = document.getElementById('share-current-code');
+function openJoinModal() {
+    const modal = document.getElementById('join-game-modal');
+    updateJoinModalUI();
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function updateHostModalUI() {
+    const notConnected = document.getElementById('host-not-connected');
+    const connectedStatus = document.getElementById('host-connected-status');
+    const roomCode = document.getElementById('host-room-code');
+    
+    if (isInRoom() && isHosting) {
+        notConnected.classList.add('hidden');
+        connectedStatus.classList.remove('hidden');
+        roomCode.textContent = getRoomCode();
+    } else {
+        notConnected.classList.remove('hidden');
+        connectedStatus.classList.add('hidden');
+    }
+}
+
+function updateJoinModalUI() {
+    const notConnected = document.getElementById('join-not-connected');
+    const connectedStatus = document.getElementById('join-connected-status');
+    const roomCode = document.getElementById('join-room-code');
     const joinError = document.getElementById('join-error');
     
     // Clear any previous errors
     joinError.classList.add('hidden');
     
-    if (isInRoom()) {
+    if (isInRoom() && !isHosting) {
+        notConnected.classList.add('hidden');
         connectedStatus.classList.remove('hidden');
-        createSection.classList.add('hidden');
-        currentCode.textContent = getRoomCode();
+        roomCode.textContent = getRoomCode();
     } else {
+        notConnected.classList.remove('hidden');
         connectedStatus.classList.add('hidden');
-        createSection.classList.remove('hidden');
     }
 }
 
@@ -944,27 +1285,49 @@ function handleSyncedState(state) {
             if (state.winner) {
                 showWinnerModal();
             }
-        } else if (state.players && state.players.length > 0) {
-            if (currentScreen === 'game-play') {
-                showScreen('game-setup');
-            }
-            // Update player lists if on those screens
+        } else {
+            // In lobby/setup phase - show player setup
+            // Update player lists based on current screen
             if (currentScreen === 'player-setup') {
+                updateProfileSection();
                 renderPlayerList();
                 updateContinueButton();
             } else if (currentScreen === 'game-setup') {
                 renderPlayerOrderList();
+            } else if (currentScreen === 'game-play') {
+                // Game was reset, go back to setup
+                showScreen('player-setup');
             }
         }
     });
 }
 
 function handleConnectionChange(status) {
-    updateShareModalUI();
+    updateHostModalUI();
+    updateJoinModalUI();
     updateSyncStatusIndicator();
     
     if (status.error) {
         showJoinError('Failed to connect. Please try again.');
+    }
+    
+    // When successfully joining a room, add profile player to the lobby
+    if (status.connected && !isHosting) {
+        // Add profile player if has profile and not already in game
+        if (hasProfile() && !isProfilePlayerInGame() && profilePlaying) {
+            addProfilePlayer();
+            // Broadcast updated state with our profile player added
+            setTimeout(() => {
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
+                // Navigate to player setup screen
+                showScreen('player-setup');
+            }, 300);
+        } else {
+            // Just navigate to player setup
+            showScreen('player-setup');
+        }
     }
 }
 

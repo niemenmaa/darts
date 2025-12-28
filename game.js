@@ -8,7 +8,10 @@ import {
     showScore, 
     resetActiveSector, 
     slideOutSector, 
-    slideInSector 
+    slideInSector,
+    getTargetCoordinates,
+    getHitFromCoordinates,
+    applyGaussianVariance
 } from './board.js';
 
 let settings = {
@@ -17,8 +20,8 @@ let settings = {
     max: 170,
     min: 2,
     mentalMathMode: false,
-    ringAccuracy: 100,    // % chance T/D hits the ring (miss = single)
-    sectorAccuracy: 100,  // % chance throw stays in sector (miss = neighbor)
+    rStdDev: 0,      // 0-1: radial standard deviation (σ)
+    angleStdDev: 0,  // 0-1: angular standard deviation (σ, fraction of 360°)
 }
 
 // Load settings from cookie
@@ -28,8 +31,8 @@ function loadSettings() {
         settings.min = saved.min ?? 2;
         settings.max = saved.max ?? 170;
         settings.mentalMathMode = saved.mentalMathMode ?? false;
-        settings.ringAccuracy = saved.ringAccuracy ?? 100;
-        settings.sectorAccuracy = saved.sectorAccuracy ?? 100;
+        settings.rStdDev = saved.rStdDev ?? 0;
+        settings.angleStdDev = saved.angleStdDev ?? 0;
     }
 }
 
@@ -39,8 +42,8 @@ function saveSettings() {
         min: settings.min,
         max: settings.max,
         mentalMathMode: settings.mentalMathMode,
-        ringAccuracy: settings.ringAccuracy,
-        sectorAccuracy: settings.sectorAccuracy
+        rStdDev: settings.rStdDev,
+        angleStdDev: settings.angleStdDev
     });
 }
 
@@ -49,8 +52,8 @@ function updateSettings(newSettings) {
     if (newSettings.min !== undefined) settings.min = Math.max(2, Math.min(170, newSettings.min));
     if (newSettings.max !== undefined) settings.max = Math.max(2, Math.min(170, newSettings.max));
     if (newSettings.mentalMathMode !== undefined) settings.mentalMathMode = newSettings.mentalMathMode;
-    if (newSettings.ringAccuracy !== undefined) settings.ringAccuracy = Math.max(0, Math.min(100, newSettings.ringAccuracy));
-    if (newSettings.sectorAccuracy !== undefined) settings.sectorAccuracy = Math.max(0, Math.min(100, newSettings.sectorAccuracy));
+    if (newSettings.rStdDev !== undefined) settings.rStdDev = Math.max(0, Math.min(1, newSettings.rStdDev));
+    if (newSettings.angleStdDev !== undefined) settings.angleStdDev = Math.max(0, Math.min(1, newSettings.angleStdDev));
     
     // Ensure min <= max
     if (settings.min > settings.max) {
@@ -94,131 +97,80 @@ export {
     clearBoardMarkers 
 };
 
-// Apply miss chance to a selection
+// Apply miss chance to a selection using polar coordinate system with Gaussian variance
 // Returns { original, actual, wasMiss, missType }
 function applyMissChance(selection) {
     if (!selection) return null;
     
     const original = { ...selection };
-    let actual = { ...selection };
-    let wasMiss = false;
+    
+    // If both stddev values are 0, no variance - return exact hit
+    if (settings.rStdDev === 0 && settings.angleStdDev === 0) {
+        return { original, actual: { ...original }, wasMiss: false, missType: null };
+    }
+    
+    // Get target coordinates for the intended throw
+    const targetCoords = getTargetCoordinates(selection);
+    if (!targetCoords) {
+        // Fallback if coordinates can't be determined
+        return { original, actual: { ...original }, wasMiss: false, missType: null };
+    }
+    
+    // Apply Gaussian variance to the coordinates
+    const actualCoords = applyGaussianVariance(
+        targetCoords.r,
+        targetCoords.angle,
+        settings.rStdDev,
+        settings.angleStdDev
+    );
+    
+    // Determine the actual hit from the deviated coordinates
+    const hitResult = getHitFromCoordinates(actualCoords.r, actualCoords.angle);
+    
+    // Create the actual selection object
+    const actual = {
+        text: hitResult.text,
+        value: hitResult.value
+    };
+    
+    // Determine if this was a miss (different from intended)
+    const wasMiss = actual.text !== original.text;
+    
+    // Determine miss type for notification
     let missType = null;
-    
-    // Parse the throw type
-    const isTriple = selection.text.startsWith('T');
-    const isDouble = selection.text.startsWith('D') || selection.value === 50;
-    const isBull = selection.value === 25 || selection.value === 50;
-    const isBull50 = selection.value === 50;
-    const isBull25 = selection.value === 25;
-    
-    // Get the base number
-    let baseNumber;
-    if (isBull) {
-        baseNumber = selection.value; // 25 or 50
-    } else if (isTriple || isDouble) {
-        baseNumber = parseInt(selection.text.substring(1));
-    } else {
-        baseNumber = selection.value;
-    }
-    
-    // Handle bull accuracy separately
-    if (isBull) {
-        // Bull 50 (inner bull / bullseye)
-        if (isBull50) {
-            // First check sector accuracy - miss = go to random sector (single)
-            if (settings.sectorAccuracy < 100) {
-                const sectorRoll = Math.random() * 100;
-                if (sectorRoll >= settings.sectorAccuracy) {
-                    // Miss to random sector (single)
-                    const randomSector = sectors[Math.floor(Math.random() * sectors.length)];
-                    actual.text = String(randomSector);
-                    actual.value = randomSector;
-                    wasMiss = true;
-                    missType = 'sector';
-                    return { original, actual, wasMiss, missType };
-                }
+    if (wasMiss) {
+        // Check what kind of miss it was
+        const originalIsTriple = original.text.startsWith('T');
+        const originalIsDouble = original.text.startsWith('D') || original.value === 50;
+        const actualIsTriple = actual.text.startsWith('T');
+        const actualIsDouble = actual.text.startsWith('D') || actual.value === 50;
+        
+        // Get base numbers for comparison
+        const getBaseNumber = (sel) => {
+            if (sel.value === 50 || sel.value === 25) return sel.value;
+            const text = sel.text;
+            if (text.startsWith('T') || text.startsWith('D')) {
+                return parseInt(text.substring(1));
             }
-            // If sector was hit, check ring accuracy - miss = becomes 25
-            if (settings.ringAccuracy < 100) {
-                const ringRoll = Math.random() * 100;
-                if (ringRoll >= settings.ringAccuracy) {
-                    actual.text = '25';
-                    actual.value = 25;
-                    wasMiss = true;
-                    missType = 'ring';
-                }
-            }
-        }
-        // 25 (outer bull)
-        else if (isBull25) {
-            // Check sector accuracy - miss = go to random sector OR rarely bull
-            if (settings.sectorAccuracy < 100) {
-                const sectorRoll = Math.random() * 100;
-                if (sectorRoll >= settings.sectorAccuracy) {
-                    wasMiss = true;
-                    missType = 'sector';
-                    // 15% chance to hit bull 50 instead, 85% chance to hit random sector
-                    if (Math.random() < 0.15) {
-                        actual.text = '50';
-                        actual.value = 50;
-                    } else {
-                        const randomSector = sectors[Math.floor(Math.random() * sectors.length)];
-                        actual.text = String(randomSector);
-                        actual.value = randomSector;
-                    }
-                }
-            }
-        }
-        return { original, actual, wasMiss, missType };
-    }
-    
-    // Step 1: Check sector accuracy (miss = go to neighbor)
-    if (settings.sectorAccuracy < 100) {
-        const roll = Math.random() * 100;
-        if (roll >= settings.sectorAccuracy) {
-            // Miss sector - go to random neighbor
-            const sectorIndex = sectors.indexOf(baseNumber);
-            const goLeft = Math.random() < 0.5;
-            const neighborIndex = goLeft 
-                ? (sectorIndex - 1 + sectors.length) % sectors.length
-                : (sectorIndex + 1) % sectors.length;
-            baseNumber = sectors[neighborIndex];
-            wasMiss = true;
+            return parseInt(text) || sel.value;
+        };
+        
+        const originalBase = getBaseNumber(original);
+        const actualBase = getBaseNumber(actual);
+        
+        // Determine miss type
+        const ringChanged = (originalIsTriple !== actualIsTriple) || 
+                           (originalIsDouble !== actualIsDouble) ||
+                           (original.value === 50 && actual.value !== 50) ||
+                           (original.value === 25 && actual.value !== 25);
+        const sectorChanged = originalBase !== actualBase;
+        
+        if (ringChanged && sectorChanged) {
+            missType = 'both';
+        } else if (ringChanged) {
+            missType = 'ring';
+        } else if (sectorChanged) {
             missType = 'sector';
-        }
-    }
-    
-    // Step 2: Check ring accuracy for T/D throws (miss = becomes single)
-    if ((isTriple || isDouble) && settings.ringAccuracy < 100) {
-        const roll = Math.random() * 100;
-        if (roll >= settings.ringAccuracy) {
-            // Miss ring - becomes single
-            actual.text = String(baseNumber);
-            actual.value = baseNumber;
-            wasMiss = true;
-            missType = missType ? 'both' : 'ring';
-        } else {
-            // Hit the ring with potentially new sector
-            if (isTriple) {
-                actual.text = `T${baseNumber}`;
-                actual.value = baseNumber * 3;
-            } else {
-                actual.text = `D${baseNumber}`;
-                actual.value = baseNumber * 2;
-            }
-        }
-    } else if (!isTriple && !isDouble) {
-        // Single throw - just update if sector changed
-        actual.text = String(baseNumber);
-        actual.value = baseNumber;
-    } else {
-        // T/D with sector change but ring hit
-        if (isTriple) {
-            actual.text = `T${baseNumber}`;
-            actual.value = baseNumber * 3;
-        } else {
-            actual.text = `D${baseNumber}`;
-            actual.value = baseNumber * 2;
         }
     }
     

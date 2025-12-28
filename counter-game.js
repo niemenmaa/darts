@@ -29,10 +29,14 @@ export {
 
 const COUNTER_COOKIE_NAME = 'dartsCounterGame';
 const HISTORY_COOKIE_NAME = 'dartsGameHistory';
+const PROFILE_COOKIE_NAME = 'dartsProfile';
 const MAX_HISTORY_GAMES = 25;
 
 // Game history - persisted across sessions
 let gameHistory = [];
+
+// Local user profile
+let userProfile = null;
 
 // Sync callback - called whenever state changes
 let onStateChangeCallback = null;
@@ -159,7 +163,8 @@ function addGameToHistory() {
             name: player.name,
             won: player.score === 0,
             finalScore: player.score,
-            rounds: [...player.history]
+            rounds: [...player.history],
+            isProfilePlayer: player.isProfilePlayer || false
         }))
     };
     
@@ -171,6 +176,14 @@ function addGameToHistory() {
     }
     
     saveGameHistory();
+    
+    // Update profile stats if profile player participated
+    if (userProfile) {
+        const profilePlayerData = game.players.find(p => p.isProfilePlayer && p.name === userProfile.name);
+        if (profilePlayerData) {
+            updateProfileStatsFromGame(profilePlayerData);
+        }
+    }
 }
 
 // Get game history
@@ -182,6 +195,187 @@ export function getGameHistory() {
 export function clearGameHistory() {
     gameHistory = [];
     document.cookie = `${HISTORY_COOKIE_NAME}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+}
+
+// ==========================================
+// Profile Management
+// ==========================================
+
+// Save profile to cookie
+function saveProfile() {
+    if (!userProfile) return;
+    const expires = new Date();
+    expires.setTime(expires.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year
+    const value = encodeURIComponent(JSON.stringify(userProfile));
+    document.cookie = `${PROFILE_COOKIE_NAME}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+}
+
+// Load profile from cookie
+function loadProfile() {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === PROFILE_COOKIE_NAME) {
+            try {
+                const saved = JSON.parse(decodeURIComponent(value));
+                if (saved && saved.name) {
+                    userProfile = saved;
+                    return true;
+                }
+            } catch (e) {
+                console.error('Failed to parse profile cookie:', e);
+            }
+        }
+    }
+    return false;
+}
+
+// Create a new profile
+export function createProfile(name) {
+    if (!name || name.trim() === '') return false;
+    
+    userProfile = {
+        name: name.trim(),
+        createdAt: new Date().toISOString(),
+        stats: {
+            gamesPlayed: 0,
+            gamesWon: 0,
+            totalDarts: 0,
+            totalPoints: 0,
+            hundredPlusCount: 0,
+            bestAvgPerTurn: 0
+        }
+    };
+    
+    // Recalculate stats from existing game history
+    recalculateProfileStats();
+    saveProfile();
+    return true;
+}
+
+// Update profile name
+export function updateProfileName(newName) {
+    if (!userProfile || !newName || newName.trim() === '') return false;
+    userProfile.name = newName.trim();
+    saveProfile();
+    return true;
+}
+
+// Delete profile
+export function deleteProfile() {
+    userProfile = null;
+    document.cookie = `${PROFILE_COOKIE_NAME}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+}
+
+// Get current profile
+export function getProfile() {
+    return userProfile ? { ...userProfile } : null;
+}
+
+// Check if profile exists
+export function hasProfile() {
+    return userProfile !== null;
+}
+
+// Recalculate profile stats from game history
+export function recalculateProfileStats() {
+    if (!userProfile) return;
+    
+    const profileName = userProfile.name;
+    const stats = {
+        gamesPlayed: 0,
+        gamesWon: 0,
+        totalDarts: 0,
+        totalPoints: 0,
+        hundredPlusCount: 0,
+        bestAvgPerTurn: 0
+    };
+    
+    for (const game of gameHistory) {
+        const playerData = game.players.find(p => p.name === profileName);
+        if (!playerData) continue;
+        
+        stats.gamesPlayed++;
+        if (playerData.won) stats.gamesWon++;
+        
+        let gamePoints = 0;
+        let gameDarts = 0;
+        
+        for (const round of playerData.rounds) {
+            for (const dart of round.throws) {
+                gameDarts++;
+                if (!round.bust) {
+                    gamePoints += dart.value;
+                }
+            }
+            
+            if (!round.bust) {
+                const turnPoints = round.throws.reduce((sum, t) => sum + t.value, 0);
+                if (turnPoints >= 100) stats.hundredPlusCount++;
+            }
+        }
+        
+        stats.totalDarts += gameDarts;
+        stats.totalPoints += gamePoints;
+        
+        // Calculate average per turn for this game
+        const validRounds = playerData.rounds.filter(r => !r.bust);
+        if (validRounds.length > 0) {
+            const avgPerTurn = gamePoints / validRounds.length;
+            if (avgPerTurn > stats.bestAvgPerTurn) {
+                stats.bestAvgPerTurn = avgPerTurn;
+            }
+        }
+    }
+    
+    userProfile.stats = stats;
+    saveProfile();
+}
+
+// Update profile stats after a game (called when game completes)
+export function updateProfileStatsFromGame(playerData) {
+    if (!userProfile || playerData.name !== userProfile.name) return;
+    
+    userProfile.stats.gamesPlayed++;
+    if (playerData.won) userProfile.stats.gamesWon++;
+    
+    let gamePoints = 0;
+    let gameDarts = 0;
+    
+    for (const round of playerData.rounds) {
+        for (const dart of round.throws) {
+            gameDarts++;
+            if (!round.bust) {
+                gamePoints += dart.value;
+            }
+        }
+        
+        if (!round.bust) {
+            const turnPoints = round.throws.reduce((sum, t) => sum + t.value, 0);
+            if (turnPoints >= 100) userProfile.stats.hundredPlusCount++;
+        }
+    }
+    
+    userProfile.stats.totalDarts += gameDarts;
+    userProfile.stats.totalPoints += gamePoints;
+    
+    // Calculate average per turn for this game
+    const validRounds = playerData.rounds.filter(r => !r.bust);
+    if (validRounds.length > 0) {
+        const avgPerTurn = gamePoints / validRounds.length;
+        if (avgPerTurn > userProfile.stats.bestAvgPerTurn) {
+            userProfile.stats.bestAvgPerTurn = avgPerTurn;
+        }
+    }
+    
+    saveProfile();
+}
+
+// Get profile average per turn (lifetime)
+export function getProfileAvgPerTurn() {
+    if (!userProfile || userProfile.stats.gamesPlayed === 0) return 0;
+    // This is a rough estimate - for precise avg we'd need to track total valid rounds
+    return userProfile.stats.totalPoints / (userProfile.stats.totalDarts / 3);
 }
 
 // ==========================================
@@ -355,6 +549,7 @@ export function getCurrentGameStats(player) {
 loadSettings();
 loadGameState();
 loadGameHistory();
+loadProfile();
 
 // Export game state getters
 export function getGameState() {
@@ -391,15 +586,40 @@ export function setMentalMathMode(enabled) {
 }
 
 // Player management
-export function addPlayer(name) {
+export function addPlayer(name, isProfilePlayer = false) {
     if (!name || name.trim() === '') return false;
     gameState.players.push({
         name: name.trim(),
         score: gameState.startingScore,
-        history: []
+        history: [],
+        isProfilePlayer
     });
     saveGameState();
     return true;
+}
+
+// Add the profile owner as a player
+export function addProfilePlayer() {
+    if (!userProfile) return false;
+    // Check if profile player is already in the game
+    if (gameState.players.some(p => p.isProfilePlayer)) return false;
+    return addPlayer(userProfile.name, true);
+}
+
+// Remove the profile player from the game
+export function removeProfilePlayer() {
+    const index = gameState.players.findIndex(p => p.isProfilePlayer);
+    if (index >= 0) {
+        gameState.players.splice(index, 1);
+        saveGameState();
+        return true;
+    }
+    return false;
+}
+
+// Check if profile player is in the current game
+export function isProfilePlayerInGame() {
+    return gameState.players.some(p => p.isProfilePlayer);
 }
 
 export function removePlayer(index) {
