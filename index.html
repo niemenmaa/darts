@@ -15,9 +15,9 @@
 </head>
 <body class="w-screen overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
   
-  <div class="container mx-auto px-3 py-3 h-full flex flex-col">
-    <header class="text-center mb-2 relative">
-      <button id="menu-btn" class="absolute left-0 top-0 p-2 text-xl text-slate-400 hover:text-white transition-colors">
+  <div class="container mx-auto px-4 py-3 sm:py-4 h-full flex flex-col max-w-md sm:max-w-lg">
+    <header class="text-center mb-4 relative">
+      <button id="menu-btn" class="absolute left-0 top-1/2 -translate-y-1/2 p-2 text-xl text-slate-400 hover:text-white transition-colors">
         ☰
       </button>
       <h1 class="text-2xl font-bold bg-gradient-to-r from-primary-400 to-emerald-300 bg-clip-text text-transparent">
@@ -27,7 +27,7 @@
     </header>
 
     <!-- Menu Dropdown -->
-    <div id="menu-dropdown" class="absolute left-3 top-12 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 z-40 hidden min-w-48 overflow-hidden">
+    <div id="menu-dropdown" class="absolute left-4 top-14 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 z-40 hidden min-w-48 overflow-hidden">
       <a href="./throw.html" class="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
         <span class="text-lg">🎲</span>
         <span>Just Throw</span>
@@ -116,7 +116,7 @@
       </div>
     </div>
 
-    <main id="app" class="max-w-2xl mx-auto flex-1 overflow-hidden">
+    <main id="app" class="flex-1 overflow-hidden flex flex-col">
       <div class="text-center mb-3">
         <div id="target-display" class="text-5xl font-bold text-emerald-400">-</div>
         <div class="flex items-center justify-center gap-4 mt-1">
@@ -130,12 +130,12 @@
         <div id="game-status" class="text-3xl font-bold mt-2 h-10"></div>
       </div>
       
-      <div id="board-container" class="w-full min-w-[95vw] sm:max-w-sm mx-auto"></div>
+      <div id="board-container" class="w-full max-w-[85vw] sm:max-w-sm mx-auto"></div>
       <div id="history-display" class="max-w-xs mx-auto mt-2 text-sm overflow-y-auto max-h-24 bg-slate-800/50 rounded-lg"></div>
     </main>
 
-    <footer class="text-center mt-4 text-slate-600 text-xs">
-      <p>by aanau</p>
+    <footer class="text-center mt-3 text-slate-600 text-xs">
+      <p>by <a href="https://nmnm.fi/en" target="_blank" class="text-slate-400 hover:text-white">niemenmaa</a></p>
     </footer>
   </div>
 
