@@ -90,6 +90,9 @@ let inInteractiveZone = false;
 // Track previous player index to detect turn changes
 let previousPlayerIndex = null;
 
+// Track if we need to add profile player after receiving initial state (for joiners)
+let pendingProfileAdd = false;
+
 // Vibration setting (stored locally, not synced)
 let vibrateOnTurnEnabled = false;
 
@@ -163,6 +166,9 @@ function init() {
     setupGamePlayScreen();
     setupModals();
     setupSync();
+    
+    // Try to restore connection from previous session
+    restoreConnection();
     
     // Check for saved game and restore appropriate screen
     if (isGameStarted()) {
@@ -460,6 +466,7 @@ function setupPlayerSetupScreen() {
         }
         // Small delay to let the broadcast go through
         setTimeout(() => {
+            clearConnectionState();
             disconnect();
             updateLobbyStatus();
             updateSyncStatusIndicator();
@@ -1275,6 +1282,7 @@ function setupModals() {
         isHosting = true;
         const roomCode = generateRoomCode();
         connectToRoom(roomCode, handleSyncedState, handleConnectionChange);
+        saveConnectionState(roomCode, true);
         // Broadcast current state immediately after connecting
         setTimeout(() => {
             if (isInRoom()) {
@@ -1285,6 +1293,7 @@ function setupModals() {
     });
     
     hostDisconnectBtn.addEventListener('click', () => {
+        clearConnectionState();
         disconnect();
         updateHostModalUI();
         updateSyncStatusIndicator();
@@ -1324,6 +1333,7 @@ function setupModals() {
         // Mark that we're joining (not hosting)
         isHosting = false;
         connectToRoom(code, handleSyncedState, handleConnectionChange);
+        saveConnectionState(code, false);
     });
     
     joinRoomInput.addEventListener('keypress', (e) => {
@@ -1338,6 +1348,7 @@ function setupModals() {
     });
     
     joinDisconnectBtn.addEventListener('click', () => {
+        clearConnectionState();
         disconnect();
         updateJoinModalUI();
         updateSyncStatusIndicator();
@@ -1477,6 +1488,35 @@ function openNewGameModal() {
 // Track if we're hosting or joining
 let isHosting = true;
 
+// Save connection state to sessionStorage
+function saveConnectionState(roomCode, hosting) {
+    sessionStorage.setItem('dartsRoomCode', roomCode);
+    sessionStorage.setItem('dartsIsHosting', String(hosting));
+}
+
+// Clear connection state from sessionStorage
+function clearConnectionState() {
+    sessionStorage.removeItem('dartsRoomCode');
+    sessionStorage.removeItem('dartsIsHosting');
+}
+
+// Restore connection from sessionStorage (called on page load)
+function restoreConnection() {
+    const savedRoomCode = sessionStorage.getItem('dartsRoomCode');
+    const savedIsHosting = sessionStorage.getItem('dartsIsHosting');
+    
+    if (savedRoomCode) {
+        isHosting = savedIsHosting === 'true';
+        
+        // Set pending profile add for joiners
+        if (!isHosting && hasProfile() && profilePlaying) {
+            pendingProfileAdd = true;
+        }
+        
+        connectToRoom(savedRoomCode, handleSyncedState, handleConnectionChange);
+    }
+}
+
 function openHostModal() {
     const modal = document.getElementById('host-game-modal');
     updateHostModalUI();
@@ -1528,6 +1568,18 @@ function updateJoinModalUI() {
 function handleSyncedState(state) {
     // Apply the synced state and update UI
     applySyncedState(state, () => {
+        // If we have a pending profile add (joiner just connected), add it now
+        if (pendingProfileAdd) {
+            pendingProfileAdd = false;
+            if (hasProfile() && !isProfilePlayerInGame() && profilePlaying) {
+                addProfilePlayer();
+                // Broadcast updated state with our profile player added
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
+            }
+        }
+        
         // Determine which screen to show based on game state
         if (state.gameStarted) {
             if (currentScreen !== 'game-play') {
@@ -1572,31 +1624,29 @@ function handleConnectionChange(status) {
     updateSyncStatusIndicator();
     
     if (status.error) {
+        clearConnectionState();
         showJoinError('Failed to connect. Please try again.');
     }
     
-    // When successfully joining a room, add profile player to the lobby
+    // Clear saved state if disconnected
+    if (!status.connected && !status.error) {
+        clearConnectionState();
+    }
+    
+    // When successfully joining a room, set flag to add profile player after receiving state
     if (status.connected && !isHosting) {
         // Close the join modal
         const joinModal = document.getElementById('join-game-modal');
         joinModal.classList.add('hidden');
         joinModal.classList.remove('flex');
         
-        // Add profile player if has profile and not already in game
-        if (hasProfile() && !isProfilePlayerInGame() && profilePlaying) {
-            addProfilePlayer();
-            // Broadcast updated state with our profile player added
-            setTimeout(() => {
-                if (isInRoom()) {
-                    broadcastState(getRawGameState());
-                }
-                // Navigate to player setup screen
-                showScreen('player-setup');
-            }, 300);
-        } else {
-            // Just navigate to player setup
-            showScreen('player-setup');
+        // Set flag to add profile player after receiving initial state
+        if (hasProfile() && profilePlaying) {
+            pendingProfileAdd = true;
         }
+        
+        // Navigate to player setup screen
+        showScreen('player-setup');
     }
 }
 
