@@ -53,7 +53,8 @@ let gameState = {
     },
     gameStarted: false,
     winner: null,
-    mentalMathMode: false
+    mentalMathMode: false,
+    selfScoreOnly: false  // Only the current player can log their own throws (profile players only)
 };
 
 // Save game state to cookie
@@ -585,6 +586,15 @@ export function setMentalMathMode(enabled) {
     saveGameState();
 }
 
+export function isSelfScoreOnly() {
+    return gameState.selfScoreOnly;
+}
+
+export function setSelfScoreOnly(enabled) {
+    gameState.selfScoreOnly = enabled;
+    saveGameState();
+}
+
 // Player management
 export function addPlayer(name, isProfilePlayer = false) {
     if (!name || name.trim() === '') return false;
@@ -956,7 +966,8 @@ export function applySyncedState(syncedState, updateUICallback) {
         currentTurn: syncedState.currentTurn || gameState.currentTurn,
         gameStarted: syncedState.gameStarted ?? gameState.gameStarted,
         winner: syncedState.winner,
-        mentalMathMode: syncedState.mentalMathMode ?? gameState.mentalMathMode
+        mentalMathMode: syncedState.mentalMathMode ?? gameState.mentalMathMode,
+        selfScoreOnly: syncedState.selfScoreOnly ?? gameState.selfScoreOnly
     };
     
     // Save locally (but don't trigger sync callback to avoid loops)

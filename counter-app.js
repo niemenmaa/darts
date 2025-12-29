@@ -15,6 +15,8 @@ import {
     getWinner,
     isMentalMathMode,
     setMentalMathMode,
+    isSelfScoreOnly,
+    setSelfScoreOnly,
     addPlayer,
     removePlayer,
     updatePlayer,
@@ -375,6 +377,7 @@ function showScreen(screenName) {
     if (screenName === 'player-setup') {
         playerSetupScreen.classList.remove('hidden');
         updateProfileSection();
+        updateLobbyStatus();
         renderPlayerList();
         updateContinueButton();
     } else if (screenName === 'game-setup') {
@@ -382,6 +385,8 @@ function showScreen(screenName) {
         updateModeButtons();
         updateDoubleOutToggle();
         updateMentalMathToggle();
+        updateSelfScoreToggle();
+        updateHostOnlyControls();
         renderPlayerOrderList();
     } else if (screenName === 'game-play') {
         gamePlayScreen.classList.remove('hidden');
@@ -441,6 +446,27 @@ function setupPlayerSetupScreen() {
             showScreen('game-setup');
         }
     });
+    
+    // Lobby disconnect button
+    const lobbyDisconnectBtn = document.getElementById('lobby-disconnect-btn');
+    lobbyDisconnectBtn.addEventListener('click', () => {
+        // Remove local profile player before disconnecting
+        if (hasProfile() && isProfilePlayerInGame()) {
+            removeProfilePlayer();
+            // Broadcast the removal before disconnecting
+            if (isInRoom()) {
+                broadcastState(getRawGameState());
+            }
+        }
+        // Small delay to let the broadcast go through
+        setTimeout(() => {
+            disconnect();
+            updateLobbyStatus();
+            updateSyncStatusIndicator();
+            renderPlayerList();
+            updateContinueButton();
+        }, 100);
+    });
 }
 
 function renderPlayerList() {
@@ -487,17 +513,30 @@ function renderPlayerList() {
         const labelText = isRemoteProfile ? 'Player' : 'Guest';
         const labelClass = isRemoteProfile ? 'text-emerald-400' : 'text-slate-500';
         
-        // Only allow editing/removing guests, not remote profile players
-        const actionsHtml = isRemoteProfile ? '' : `
-            <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                <button class="edit-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Edit">
-                    ✏️
-                </button>
-                <button class="delete-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Remove">
-                    ×
-                </button>
-            </div>
-        `;
+        // Determine action buttons based on player type and host status
+        let actionsHtml = '';
+        if (isRemoteProfile) {
+            // Remote profile players can only be kicked by the host
+            if (isHosting && isInRoom()) {
+                actionsHtml = `
+                    <button class="kick-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all opacity-60 group-hover:opacity-100" data-index="${actualIndex}" title="Kick">
+                        🚫
+                    </button>
+                `;
+            }
+        } else {
+            // Guests can be edited/removed by anyone
+            actionsHtml = `
+                <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <button class="edit-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Edit">
+                        ✏️
+                    </button>
+                    <button class="delete-player-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-all" data-index="${actualIndex}" title="Remove">
+                        ×
+                    </button>
+                </div>
+            `;
+        }
         
         return `
             <div class="flex items-center gap-2 p-3 ${cardClass} rounded-xl border group hover:border-slate-600 transition-all">
@@ -539,6 +578,24 @@ function renderPlayerList() {
             }
         });
     });
+    
+    // Kick button handler (host only)
+    playerList.querySelectorAll('.kick-player-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.index);
+            const players = getPlayers();
+            const playerName = players[index]?.name || 'this player';
+            if (confirm(`Kick ${playerName} from the lobby?`)) {
+                removePlayer(index);
+                renderPlayerList();
+                updateContinueButton();
+                // Broadcast if in room
+                if (isInRoom()) {
+                    broadcastState(getRawGameState());
+                }
+            }
+        });
+    });
 }
 
 function updateContinueButton() {
@@ -555,32 +612,50 @@ function setupGameSetupScreen() {
     const mode501Btn = document.getElementById('mode-501-btn');
     const doubleOutToggle = document.getElementById('double-out-toggle');
     const mentalMathToggle = document.getElementById('mental-math-toggle');
+    const selfScoreToggle = document.getElementById('self-score-toggle');
     const backToPlayersBtn = document.getElementById('back-to-players-btn');
     const startGameBtn = document.getElementById('start-game-btn');
     
     // Mode selection
     mode301Btn.addEventListener('click', () => {
+        if (isInRoom() && !isHosting) return; // Only host can change
         setGameMode(301);
         updateModeButtons();
+        if (isInRoom()) broadcastState(getRawGameState());
     });
     
     mode501Btn.addEventListener('click', () => {
+        if (isInRoom() && !isHosting) return; // Only host can change
         setGameMode(501);
         updateModeButtons();
+        if (isInRoom()) broadcastState(getRawGameState());
     });
     
     // Double out toggle
     doubleOutToggle.addEventListener('click', () => {
+        if (isInRoom() && !isHosting) return; // Only host can change
         const currentState = doubleOutToggle.dataset.enabled === 'true';
         setDoubleOut(!currentState);
         updateDoubleOutToggle();
+        if (isInRoom()) broadcastState(getRawGameState());
     });
     
     // Mental math toggle
     mentalMathToggle.addEventListener('click', () => {
+        if (isInRoom() && !isHosting) return; // Only host can change
         const currentState = mentalMathToggle.dataset.enabled === 'true';
         setMentalMathMode(!currentState);
         updateMentalMathToggle();
+        if (isInRoom()) broadcastState(getRawGameState());
+    });
+    
+    // Self score only toggle
+    selfScoreToggle.addEventListener('click', () => {
+        if (isInRoom() && !isHosting) return; // Only host can change
+        const currentState = selfScoreToggle.dataset.enabled === 'true';
+        setSelfScoreOnly(!currentState);
+        updateSelfScoreToggle();
+        if (isInRoom()) broadcastState(getRawGameState());
     });
     
     // Navigation
@@ -589,6 +664,7 @@ function setupGameSetupScreen() {
     });
     
     startGameBtn.addEventListener('click', () => {
+        if (isInRoom() && !isHosting) return; // Only host can start
         if (startGame()) {
             // Initialize turn tracking - first player starts
             previousPlayerIndex = 0;
@@ -598,6 +674,8 @@ function setupGameSetupScreen() {
             }
             setupBoard();
             showScreen('game-play');
+            // Broadcast game start
+            if (isInRoom()) broadcastState(getRawGameState());
         }
     });
 }
@@ -650,6 +728,66 @@ function updateMentalMathToggle() {
         toggle.classList.add('bg-slate-600');
         toggle.classList.remove('bg-emerald-500');
         knob.classList.remove('translate-x-5');
+    }
+}
+
+function updateSelfScoreToggle() {
+    const toggle = document.getElementById('self-score-toggle');
+    if (!toggle) return;
+    const knob = toggle.querySelector('span');
+    const enabled = isSelfScoreOnly();
+    
+    toggle.dataset.enabled = String(enabled);
+    
+    if (enabled) {
+        toggle.classList.remove('bg-slate-600');
+        toggle.classList.add('bg-emerald-500');
+        knob.classList.add('translate-x-5');
+    } else {
+        toggle.classList.add('bg-slate-600');
+        toggle.classList.remove('bg-emerald-500');
+        knob.classList.remove('translate-x-5');
+    }
+}
+
+function updateHostOnlyControls() {
+    const mode301Btn = document.getElementById('mode-301-btn');
+    const mode501Btn = document.getElementById('mode-501-btn');
+    const doubleOutToggle = document.getElementById('double-out-toggle');
+    const mentalMathToggle = document.getElementById('mental-math-toggle');
+    const selfScoreToggle = document.getElementById('self-score-toggle');
+    const startGameBtn = document.getElementById('start-game-btn');
+    
+    // Check if user can control settings (not in room, or is host)
+    const canControl = !isInRoom() || isHosting;
+    
+    // Update button states
+    const controls = [mode301Btn, mode501Btn, doubleOutToggle, mentalMathToggle, selfScoreToggle];
+    controls.forEach(ctrl => {
+        if (ctrl) {
+            if (canControl) {
+                ctrl.disabled = false;
+                ctrl.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                ctrl.disabled = true;
+                ctrl.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    });
+    
+    // Update start button
+    if (startGameBtn) {
+        if (canControl) {
+            startGameBtn.disabled = false;
+            startGameBtn.textContent = 'Start';
+            startGameBtn.classList.remove('bg-slate-600');
+            startGameBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+        } else {
+            startGameBtn.disabled = true;
+            startGameBtn.textContent = 'Waiting for host...';
+            startGameBtn.classList.add('bg-slate-600');
+            startGameBtn.classList.remove('bg-emerald-500', 'hover:bg-emerald-400');
+        }
     }
 }
 
@@ -861,6 +999,22 @@ function setupBoardEventListeners(board) {
 
 function handleThrowInput(throwData) {
     if (getWinner()) return;
+    
+    // Check if self-score-only mode is enabled
+    if (isSelfScoreOnly()) {
+        const currentPlayer = getCurrentPlayer();
+        const localProfile = getProfile();
+        
+        // If current player is a profile player, only their device can log throws
+        if (currentPlayer && currentPlayer.isProfilePlayer) {
+            const isMyTurnToScore = localProfile && currentPlayer.name === localProfile.name;
+            if (!isMyTurnToScore) {
+                showGameMessage('Wait for your turn!', 'text-amber-400');
+                return;
+            }
+        }
+        // Guests can be scored by anyone
+    }
     
     const result = addThrow(throwData.text, throwData.value, throwData.isDouble);
     
@@ -1396,6 +1550,11 @@ function handleSyncedState(state) {
                 renderPlayerList();
                 updateContinueButton();
             } else if (currentScreen === 'game-setup') {
+                updateModeButtons();
+                updateDoubleOutToggle();
+                updateMentalMathToggle();
+                updateSelfScoreToggle();
+                updateHostOnlyControls();
                 renderPlayerOrderList();
             } else if (currentScreen === 'game-play') {
                 // Game was reset, go back to setup
@@ -1418,6 +1577,11 @@ function handleConnectionChange(status) {
     
     // When successfully joining a room, add profile player to the lobby
     if (status.connected && !isHosting) {
+        // Close the join modal
+        const joinModal = document.getElementById('join-game-modal');
+        joinModal.classList.add('hidden');
+        joinModal.classList.remove('flex');
+        
         // Add profile player if has profile and not already in game
         if (hasProfile() && !isProfilePlayerInGame() && profilePlaying) {
             addProfilePlayer();
@@ -1455,6 +1619,34 @@ function updateSyncStatusIndicator() {
         codeDisplay.textContent = getRoomCode();
     } else {
         indicator.classList.add('hidden');
+    }
+    
+    // Also update the lobby status bar
+    updateLobbyStatus();
+}
+
+function updateLobbyStatus() {
+    const lobbyStatus = document.getElementById('lobby-status');
+    const lobbyStatusText = document.getElementById('lobby-status-text');
+    const lobbyRoomCode = document.getElementById('lobby-room-code');
+    
+    if (!lobbyStatus) return;
+    
+    if (isInRoom()) {
+        lobbyStatus.classList.remove('hidden');
+        lobbyRoomCode.textContent = getRoomCode();
+        
+        if (isHosting) {
+            lobbyStatus.className = 'mb-4 p-3 rounded-xl border bg-amber-500/10 border-amber-500/30';
+            lobbyStatusText.textContent = 'Hosting';
+            lobbyStatusText.className = 'text-sm text-amber-300';
+        } else {
+            lobbyStatus.className = 'mb-4 p-3 rounded-xl border bg-emerald-500/10 border-emerald-500/30';
+            lobbyStatusText.textContent = 'Connected';
+            lobbyStatusText.className = 'text-sm text-emerald-300';
+        }
+    } else {
+        lobbyStatus.classList.add('hidden');
     }
 }
 

@@ -101,6 +101,20 @@
           </div>
         </div>
         
+        <!-- Lobby Connection Status (shown when in a room) -->
+        <div id="lobby-status" class="hidden mb-4 p-3 rounded-xl border">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="lobby-status-text" class="text-sm text-emerald-300">Connected</span>
+              <span id="lobby-room-code" class="text-xs font-mono text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded">ABC123</span>
+            </div>
+            <button id="lobby-disconnect-btn" class="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all border border-red-500/20">
+              Leave
+            </button>
+          </div>
+        </div>
+        
         <div class="text-center mb-3">
           <h2 class="text-sm font-medium text-slate-400">Add Guests</h2>
         </div>
@@ -160,12 +174,24 @@
         </div>
         
         <!-- Mental Math Mode Toggle -->
-        <div class="flex items-center justify-between py-3 px-4 bg-slate-800/80 rounded-xl mb-6 border border-slate-700/50">
+        <div class="flex items-center justify-between py-3 px-4 bg-slate-800/80 rounded-xl mb-3 border border-slate-700/50">
           <div>
             <label class="text-sm font-medium text-white">Mental Math</label>
             <p class="text-xs text-slate-500 mt-0.5">Only shows total – you subtract</p>
           </div>
           <button id="mental-math-toggle" type="button" data-enabled="false"
+            class="relative w-12 h-7 rounded-full bg-slate-600 transition-colors focus:outline-none flex-shrink-0">
+            <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform shadow-lg"></span>
+          </button>
+        </div>
+        
+        <!-- Self Score Only Toggle -->
+        <div class="flex items-center justify-between py-3 px-4 bg-slate-800/80 rounded-xl mb-6 border border-slate-700/50">
+          <div>
+            <label class="text-sm font-medium text-white">Self Score Only</label>
+            <p class="text-xs text-slate-500 mt-0.5">Players log their own throws</p>
+          </div>
+          <button id="self-score-toggle" type="button" data-enabled="false"
             class="relative w-12 h-7 rounded-full bg-slate-600 transition-colors focus:outline-none flex-shrink-0">
             <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform shadow-lg"></span>
           </button>
@@ -211,7 +237,7 @@
         <div id="board-container" class="w-full min-w-[95vw] sm:max-w-sm mx-auto"></div>
           
         <!-- All Players Scoreboard -->
-        <div id="all-players-scores" class="flex justify-center gap-3 mt-3 flex-wrap px-2">
+        <div id="all-playxers-scores" class="flex justify-center gap-3 mt-3 flex-wrap px-2">
           <!-- Player scores will be inserted here -->
         </div>
         
