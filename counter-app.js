@@ -143,6 +143,7 @@ function handleTurnChange(newPlayerIndex) {
         // Turn has changed - check if it's now my turn
         if (isMyTurn()) {
             vibratePhone(300); // Slightly longer vibration for turn notification
+            showGameMessage("It's your turn!", 'text-emerald-400');
         }
     }
     previousPlayerIndex = newPlayerIndex;
@@ -675,9 +676,10 @@ function setupGameSetupScreen() {
         if (startGame()) {
             // Initialize turn tracking - first player starts
             previousPlayerIndex = 0;
-            // Vibrate if the local profile player starts first
+            // Notify if the local profile player starts first
             if (isMyTurn()) {
                 vibratePhone(300);
+                setTimeout(() => showGameMessage("It's your turn!", 'text-emerald-400'), 100);
             }
             setupBoard();
             showScreen('game-play');
@@ -801,12 +803,24 @@ function updateHostOnlyControls() {
 function renderPlayerOrderList() {
     const listContainer = document.getElementById('player-order-list');
     const players = getPlayers();
+    const localProfile = getProfile();
     
     listContainer.innerHTML = players.map((player, index) => {
         const isProfile = player.isProfilePlayer;
+        const isLocalProfile = isProfile && localProfile && player.name === localProfile.name;
         const badgeClass = isProfile 
             ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-slate-900' 
             : 'bg-slate-600 text-white';
+        
+        // Determine label: "You" for local profile, "Player" for remote profiles, "Guest" for guests
+        let labelHtml;
+        if (isLocalProfile) {
+            labelHtml = '<span class="text-xs text-amber-400/70">You</span>';
+        } else if (isProfile) {
+            labelHtml = '<span class="text-xs text-emerald-400/70">Player</span>';
+        } else {
+            labelHtml = '<span class="text-xs text-slate-500">Guest</span>';
+        }
         
         return `
             <div class="flex items-center gap-2 p-3 ${isProfile ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800/60 border-slate-700/50'} rounded-xl border group hover:border-slate-600 transition-all">
@@ -814,7 +828,7 @@ function renderPlayerOrderList() {
                     ${index + 1}
                 </span>
                 <span class="flex-1 text-white font-medium truncate text-sm">${escapeHtml(player.name)}</span>
-                ${isProfile ? '<span class="text-xs text-amber-400/70">You</span>' : '<span class="text-xs text-slate-500">Guest</span>'}
+                ${labelHtml}
                 <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                     <button class="order-move-up-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-all text-sm ${index === 0 ? 'invisible' : ''}" data-index="${index}">
                         ↑
