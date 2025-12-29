@@ -601,14 +601,15 @@ export function addPlayer(name, isProfilePlayer = false) {
 // Add the profile owner as a player
 export function addProfilePlayer() {
     if (!userProfile) return false;
-    // Check if profile player is already in the game
-    if (gameState.players.some(p => p.isProfilePlayer)) return false;
+    // Check if LOCAL profile player is already in the game (by name match)
+    if (gameState.players.some(p => p.isProfilePlayer && p.name === userProfile.name)) return false;
     return addPlayer(userProfile.name, true);
 }
 
-// Remove the profile player from the game
+// Remove the LOCAL profile player from the game
 export function removeProfilePlayer() {
-    const index = gameState.players.findIndex(p => p.isProfilePlayer);
+    if (!userProfile) return false;
+    const index = gameState.players.findIndex(p => p.isProfilePlayer && p.name === userProfile.name);
     if (index >= 0) {
         gameState.players.splice(index, 1);
         saveGameState();
@@ -617,9 +618,11 @@ export function removeProfilePlayer() {
     return false;
 }
 
-// Check if profile player is in the current game
+// Check if the LOCAL profile player is in the current game
+// This checks for a player that is both a profile player AND matches the local profile's name
 export function isProfilePlayerInGame() {
-    return gameState.players.some(p => p.isProfilePlayer);
+    if (!userProfile) return false;
+    return gameState.players.some(p => p.isProfilePlayer && p.name === userProfile.name);
 }
 
 export function removePlayer(index) {
